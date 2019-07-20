@@ -5070,15 +5070,7 @@
             (do (vswap! seen conj input)
                 (rf result input))))))))
   ([coll]
-   (let [step (fn step [xs seen]
-                (lazy-seq
-                  ((fn [[f :as xs] seen]
-                     (when-let [s (seq xs)]
-                       (if (contains? seen f)
-                         (recur (rest s) seen)
-                         (cons f (step (rest s) (conj seen f))))))
-                   xs seen)))]
-     (step coll #{}))))
+   (lazy-seq-2 (distinct) coll)))
 
 
 
