@@ -7284,7 +7284,7 @@ fails, attempts to require sym's namespace and retries."
                 (rf result v))
               result))))))
   ([n coll]
-     (partition-all n n coll))
+     (lazy-seq-2 (partition-all n) coll))
   ([n step coll]
      (lazy-seq
       (when-let [s (seq coll)]
@@ -7317,18 +7317,7 @@ fails, attempts to require sym's namespace and retries."
          ([result input]
           (rf result (f (vswap! i inc) input)))))))
   ([f coll]
-   (letfn [(mapi [idx coll]
-                 (lazy-seq
-                   (when-let [s (seq coll)]
-                     (if (chunked-seq? s)
-                       (let [c (chunk-first s)
-                             size (int (count c))
-                             b (chunk-buffer size)]
-                         (dotimes [i size]
-                           (chunk-append b (f (+ idx i) (.nth c i))))
-                         (chunk-cons (chunk b) (mapi (+ idx size) (chunk-rest s))))
-                       (cons (f idx (first s)) (mapi (inc idx) (rest s)))))))]
-     (mapi 0 coll))))
+   (lazy-seq-2 (map-indexed f) coll)))
 
 (defn keep
   "Returns a lazy sequence of the non-nil results of (f item). Note,
@@ -7369,23 +7358,7 @@ fails, attempts to require sym's namespace and retries."
                 result
                 (rf result v))))))))
   ([f coll]
-     (letfn [(keepi [idx coll]
-               (lazy-seq
-                (when-let [s (seq coll)]
-                  (if (chunked-seq? s)
-                    (let [c (chunk-first s)
-                          size (count c)
-                          b (chunk-buffer size)]
-                      (dotimes [i size]
-                        (let [x (f (+ idx i) (.nth c i))]
-                          (when-not (nil? x)
-                            (chunk-append b x))))
-                      (chunk-cons (chunk b) (keepi (+ idx size) (chunk-rest s))))
-                    (let [x (f idx (first s))]
-                      (if (nil? x)
-                        (keepi (inc idx) (rest s))
-                        (cons x (keepi (inc idx) (rest s)))))))))]
-       (keepi 0 coll))))
+     (lazy-seq-2 (keep-indexed f) coll)))
 
 (defn bounded-count
   "If coll is counted? returns its count, else will count at most the first n
@@ -7674,7 +7647,7 @@ fails, attempts to require sym's namespace and retries."
               (if (= prior input)
                 result
                 (rf result input))))))))
-  ([coll] (sequence (dedupe) coll)))
+  ([coll] (lazy-seq-2 (dedupe) coll)))
 
 (defn random-sample
   "Returns items from coll with random probability of prob (0.0 -
