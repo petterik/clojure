@@ -14,14 +14,30 @@ package clojure.lang;
 
 import java.util.*;
 
-public final class LazySeq extends Obj implements ISeq, Sequential, List, IPending, IHashEq{
+public final class LazySeq extends Obj implements Reducible, ISeq, Sequential, List, IPending, IHashEq{
+
+private static final Keyword REDUCED_SEQ = Keyword.intern("clojure.lang.LazySeq", "REDUCED_SEQ");
+private static final Var STRICT_REDUCIBLE_SEQS = RT.var("clojure.lang.LazySeq","*strict-reducible-seqs*").setDynamic();
+
+static {
+	STRICT_REDUCIBLE_SEQS.doReset(false);
+}
 
 private IFn fn;
 private Object sv;
 private ISeq s;
+private IFn xf;
+private Object coll;
 
 public LazySeq(IFn fn){
 	this.fn = fn;
+}
+
+public LazySeq(IFn xf, Object coll, Object ls) {
+	this.fn = null;
+	this.xf = xf;
+	this.coll = coll;
+	this.sv = ls;
 }
 
 private LazySeq(IPersistentMap meta, ISeq s){
@@ -36,7 +52,52 @@ public Obj withMeta(IPersistentMap meta){
 	return new LazySeq(meta, seq());
 }
 
+private static boolean isStrictlyReducible(){
+	return (boolean)STRICT_REDUCIBLE_SEQS.get();
+}
+
+private static IFn CLOJURE_EDUCTION = null;
+
+private static IFn clojureEduction() {
+	if (CLOJURE_EDUCTION == null) {
+		IFn eduction = RT.CLOJURE_NS.findInternedVar(Symbol.intern("eduction"));
+		if (eduction != null) {
+			CLOJURE_EDUCTION = eduction;
+		}
+	}
+	return CLOJURE_EDUCTION;
+}
+
+public IReduceInit reducible() {
+	IFn edu;
+	if (xf != null && ((edu = clojureEduction()) != null)) {
+		IReduceInit reducible = (IReduceInit) edu.invoke(xf, coll);
+		xf = REDUCED_SEQ;
+		coll = null;
+		if (isStrictlyReducible()) {
+			// Remove the reference to the seq value when strictly
+			// enforcing the sequence not being seqable again, to
+			// help the gc.
+			sv = null;
+		}
+		return reducible;
+	}
+	return null;
+}
+
 final synchronized Object sval(){
+	if (xf == REDUCED_SEQ) {
+		if (isStrictlyReducible()) {
+			throw new RuntimeException("LazySeq had already been reduced");
+		} else {
+			System.err.println("WARN: Reduced seq is being reused");
+			new Exception().printStackTrace();
+		}
+	}
+	// Just as the sequence is about to be realized, remove
+	// the pointers to the original collection.
+	xf = null;
+	coll = null;
 	if(fn != null)
 		{
                 sv = fn.invoke();
@@ -241,8 +302,8 @@ public boolean addAll(int index, Collection c){
 	throw new UnsupportedOperationException();
 }
 
-
 synchronized public boolean isRealized(){
 	return fn == null;
 }
+
 }
