@@ -2861,8 +2861,13 @@
   {:added "1.0"
    :static true}
   ([f] (comp (map f) cat))
-  ([f & colls]
-     (apply concat (apply map f colls))))
+  ([f coll]
+   (lazy-seq-2
+     (mapcat f)
+     coll
+     (apply concat (map f coll))))
+  ([f coll & colls]
+     (apply concat (apply map f (cons coll colls)))))
 
 (defn filter
   "Returns a lazy sequence of the items in coll for which
@@ -2880,21 +2885,7 @@
              (rf result input)
              result)))))
   ([pred coll]
-   (lazy-seq
-    (when-let [s (seq coll)]
-      (if (chunked-seq? s)
-        (let [c (chunk-first s)
-              size (count c)
-              b (chunk-buffer size)]
-          (dotimes [i size]
-              (let [v (.nth c i)]
-                (when (pred v)
-                  (chunk-append b v))))
-          (chunk-cons (chunk b) (filter pred (chunk-rest s))))
-        (let [f (first s) r (rest s)]
-          (if (pred f)
-            (cons f (filter pred r))
-            (filter pred r))))))))
+   (lazy-seq-2 (filter pred) coll)))
 
 
 (defn remove
