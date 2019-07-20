@@ -99,9 +99,7 @@
   (coll-reduce
    ([coll f] (seq-reduce coll f))
    ([coll f val]
-    (if-some [reducible (.reducible coll)]
-      (.reduce reducible f val)
-      (seq-reduce coll f val))))
+    (seq-reduce coll f val)))
 
   ;;vector's chunked seq is faster than its iter
   clojure.lang.PersistentVector
