@@ -20,7 +20,7 @@ private static final Keyword REDUCED_SEQ = Keyword.intern("clojure.lang.LazySeq"
 private static final Var STRICT_REDUCIBLE_SEQS = RT.var("clojure.lang.LazySeq","*strict-reducible-seqs*").setDynamic();
 
 static {
-	STRICT_REDUCIBLE_SEQS.doReset(false);
+	STRICT_REDUCIBLE_SEQS.doReset(true);
 }
 
 private IFn fn;
@@ -58,14 +58,13 @@ private static boolean isStrictlyReducible(){
 private void ensureNotReduced(){
 	if (coll == REDUCED_SEQ) {
 		if (isStrictlyReducible()) {
-			throw new RuntimeException("LazySeq had already been reduced");
+			throw new RuntimeException("LazySeq's internals were destroyed when used as a Reducible");
 		} else {
 			System.err.println("WARN: Reduced seq is being reused");
 			new Exception().printStackTrace();
 		}
 	}
 }
-
 
 private static final Object EDUCTION_LOCK = new Object();
 private static IFn CLOJURE_EDUCTION = null;
