@@ -100,7 +100,7 @@
    ([coll f] (seq-reduce coll f))
    ([coll f val]
     (if-some [reducible (.reducible coll)]
-      (coll-reduce reducible f val)
+      (.reduce reducible f val)
       (seq-reduce coll f val))))
 
   ;;vector's chunked seq is faster than its iter
