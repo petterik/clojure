@@ -2925,10 +2925,7 @@
                   (ensure-reduced result)
                   result)))))))
   ([n coll]
-     (lazy-seq
-      (when (pos? n) 
-        (when-let [s (seq coll)]
-          (cons (first s) (take (dec n) (rest s))))))))
+   (lazy-seq-2 (take n) coll)))
 
 (defn take-while
   "Returns a lazy sequence of successive items from coll while
@@ -2946,10 +2943,7 @@
               (rf result input)
               (reduced result))))))
   ([pred coll]
-     (lazy-seq
-      (when-let [s (seq coll)]
-        (when (pred (first s))
-          (cons (first s) (take-while pred (rest s))))))))
+     (lazy-seq-2 (take-while pred) coll)))
 
 (defn drop
   "Returns a lazy sequence of all but the first n items in coll.
@@ -2969,12 +2963,7 @@
                   result
                   (rf result input))))))))
   ([n coll]
-     (let [step (fn [n coll]
-                  (let [s (seq coll)]
-                    (if (and (pos? n) s)
-                      (recur (dec n) (rest s))
-                      s)))]
-       (lazy-seq (step n coll)))))
+     (lazy-seq-2 (drop n) coll)))
 
 (defn drop-last
   "Return a lazy sequence of all but the last n (default 1) items in coll"
@@ -3014,12 +3003,7 @@
                     (vreset! dv nil)
                     (rf result input)))))))))
   ([pred coll]
-     (let [step (fn [pred coll]
-                  (let [s (seq coll)]
-                    (if (and s (pred (first s)))
-                      (recur pred (rest s))
-                      s)))]
-       (lazy-seq (step pred coll)))))
+   (lazy-seq-2 (drop-while pred) coll)))
 
 (defn cycle
   "Returns a lazy (infinite!) sequence of repetitions of the items in coll."
