@@ -1537,7 +1537,7 @@
   ([xf coll]
    (lazy-seq-2 xf coll (xf-seq xf coll)))
   ([xf coll ls]
-   (list 'new 'clojure.lang.LazySeq xf coll ls)))
+   (clojure.lang.LazySeq. xf coll ls)))
 
 ;;list stuff
 (defn peek
@@ -2826,16 +2826,7 @@
         ([result input & inputs]
            (rf result (apply f input inputs))))))
   ([f coll]
-   (lazy-seq
-    (when-let [s (seq coll)]
-      (if (chunked-seq? s)
-        (let [c (chunk-first s)
-              size (int (count c))
-              b (chunk-buffer size)]
-          (dotimes [i size]
-              (chunk-append b (f (.nth c i))))
-          (chunk-cons (chunk b) (map f (chunk-rest s))))
-        (cons (f (first s)) (map f (rest s)))))))
+   (lazy-seq-2 (map f) coll))
   ([f c1 c2]
    (lazy-seq
     (let [s1 (seq c1) s2 (seq c2)]
