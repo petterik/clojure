@@ -55,38 +55,8 @@ public Obj withMeta(IPersistentMap meta){
 private static boolean isStrictlyReducible(){
 	return (boolean)STRICT_REDUCIBLE_SEQS.get();
 }
-
-private static IFn CLOJURE_EDUCTION = null;
-
-private static IFn clojureEduction() {
-	if (CLOJURE_EDUCTION == null) {
-		IFn eduction = RT.CLOJURE_NS.findInternedVar(Symbol.intern("eduction"));
-		if (eduction != null) {
-			CLOJURE_EDUCTION = eduction;
-		}
-	}
-	return CLOJURE_EDUCTION;
-}
-
-public IReduceInit reducible() {
-	IFn edu;
-	if (xf != null && ((edu = clojureEduction()) != null)) {
-		IReduceInit reducible = (IReduceInit) edu.invoke(xf, coll);
-		xf = REDUCED_SEQ;
-		coll = null;
-		if (isStrictlyReducible()) {
-			// Remove the reference to the seq value when strictly
-			// enforcing the sequence not being seqable again, to
-			// help the gc.
-			sv = null;
-		}
-		return reducible;
-	}
-	return null;
-}
-
-final synchronized Object sval(){
-	if (xf == REDUCED_SEQ) {
+private void ensureNotReduced(){
+	if (coll == REDUCED_SEQ) {
 		if (isStrictlyReducible()) {
 			throw new RuntimeException("LazySeq had already been reduced");
 		} else {
@@ -94,15 +64,57 @@ final synchronized Object sval(){
 			new Exception().printStackTrace();
 		}
 	}
-	// Just as the sequence is about to be realized, remove
-	// the pointers to the original collection.
-	xf = null;
-	coll = null;
-	if(fn != null)
-		{
-                sv = fn.invoke();
-                fn = null;
+}
+
+
+private static final Object EDUCTION_LOCK = new Object();
+private static IFn CLOJURE_EDUCTION = null;
+
+private static IFn clojureEduction() {
+	if (CLOJURE_EDUCTION == null) {
+		synchronized (EDUCTION_LOCK) {
+			if (CLOJURE_EDUCTION == null) {
+				CLOJURE_EDUCTION = RT.CLOJURE_NS.findInternedVar(Symbol.intern("eduction"));
+			}
 		}
+	}
+	return CLOJURE_EDUCTION;
+}
+
+public IReduceInit reducible() {
+	if (xf != null) {
+		IReduceInit reducible = (IReduceInit)clojureEduction().invoke(xf, coll);
+		xf = null;
+		coll = REDUCED_SEQ;
+		if (isStrictlyReducible()) {
+			// Remove the reference to the seq value when strictly
+			// enforcing the sequence not being seqable again, to
+			// help the gc.
+			sv = null;
+		}
+		return reducible;
+	} else {
+		ensureNotReduced();
+		return null;
+	}
+}
+
+final synchronized Object sval(){
+	if(fn != null) {
+		sv = fn.invoke();
+		fn = null;
+	} else {
+		// There was no function, it might be a reducible lazy seq.
+		// Reducible seq's coll is either a coll or the REDUCIBLE_SEQ value.
+		// i.e. not null.
+		if (coll != null) {
+			// Ensure the collection was not reduced and safely null out
+			// the reducible parts of the sequence.
+			ensureNotReduced();
+			xf = null;
+			coll = null;
+		}
+	}
 	if(sv != null)
 		return sv;
 	return s;

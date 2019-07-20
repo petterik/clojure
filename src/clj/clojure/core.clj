@@ -742,28 +742,6 @@
                          (cat (first zs) (next zs)))))))]
        (cat (concat x y) zs))))
 
-;; TODO: Move back.
-
-(defn reduced
-  "Wraps x in a way such that a reduce will terminate with the value x"
-  {:added "1.5"}
-  [x]
-  (clojure.lang.Reduced. x))
-
-(defn reduced?
-  "Returns true if x is the result of a call to reduced"
-  {:inline (fn [x] `(clojure.lang.RT/isReduced ~x ))
-   :inline-arities #{1}
-   :added "1.5"}
-  ([x] (clojure.lang.RT/isReduced x)))
-
-(defn ^:private preserving-reduced
-  [rf]
-  #(let [ret (rf %1 %2)]
-     (if (reduced? ret)
-       (reduced ret)
-       ret)))
-
 ;;;;;;;;;;;;;;;;at this point all the support for syntax-quote exists;;;;;;;;;;;;;;;;;;;;;;
 (defmacro delay
   "Takes a body of expressions and yields a Delay object that will
@@ -1478,8 +1456,10 @@
 
 ;;Collection stuff
 
-(def xf-seq
-  (let [buffer-cons (fn [^java.util.ArrayList buf more]
+(def ^:static xf-seq
+  (let [step (clojure.lang.Var/create)
+
+        buffer-cons (fn [^java.util.ArrayList buf more]
                       (let [s (.size buf)]
                         (if (== s 1)
                           (cons (.get buf 0) more)
@@ -1489,29 +1469,29 @@
                               (clojure.lang.ArrayChunk. (.toArray buf))
                               more)))))
 
-        yield-aseq (fn [step s xf buf]
+        yield-aseq (fn [s xf buf]
                      (buffer-cons buf
                        (lazy-seq
                          (step s xf buf))))
 
-        step* (fn [step s xf buf]
+        step* (fn [s xf buf]
                 (if (chunked-seq? s)
                   (let [buf (.reduce (chunk-first s) xf buf)]
                     (if (clojure.lang.RT/isReduced buf)
                       (buffer-cons (xf (.deref ^clojure.lang.Reduced buf)) nil)
-                      (yield-aseq step (chunk-rest s) xf buf)))
+                      (yield-aseq (chunk-rest s) xf buf)))
                   (let [buf (xf buf (first s))
                         s (rest s)]
                     (if (clojure.lang.RT/isReduced buf)
                       (buffer-cons (xf (.deref ^clojure.lang.Reduced buf)) nil)
                       (if (clojure.lang.Numbers/isPos (.size ^java.util.ArrayList buf))
-                        (yield-aseq step s xf buf)
+                        (yield-aseq s xf buf)
                         ;; Unable to get an item, recur inside this
                         ;; function with the next seq to avoid blowing
                         ;; the stack.
                         (let [s (seq s)]
                           (if s
-                            (recur step s xf buf)
+                            (recur s xf buf)
                             (buffer-cons (xf buf) nil))))))))
 
         arr-conj! (fn
@@ -1519,19 +1499,19 @@
                     ([buf] buf)
                     ([^java.util.ArrayList buf x]
                      (.add buf x)
-                     buf))
-
-        step (fn self [s xf buf]
-               (.clear ^java.util.ArrayList buf)
-               (let [s (seq s)]
-                 (if s
-                   (step* self s xf buf)
-                   (buffer-cons (xf buf) nil))))]
-    (fn [xform coll]
-      (lazy-seq
-        (let [s (seq coll)]
-          (when s
-            (step s (xform arr-conj!) (java.util.ArrayList. 4))))))))
+                     buf))]
+    (.bindRoot step (fn [s xf buf]
+                      (.clear ^java.util.ArrayList buf)
+                      (let [s (seq s)]
+                        (if s
+                          (step* s xf buf)
+                          (buffer-cons (xf buf) nil)))))
+    (let [step (.deref step)]
+      (fn [xform coll]
+        (lazy-seq
+          (let [s (seq coll)]
+            (when s
+              (step s (xform arr-conj!) (java.util.ArrayList. 4)))))))))
 
 (defn lazy-seq-2
   ([xf coll]
@@ -2897,6 +2877,19 @@
   ([pred] (filter (complement pred)))
   ([pred coll]
      (filter (complement pred) coll)))
+
+(defn reduced
+  "Wraps x in a way such that a reduce will terminate with the value x"
+  {:added "1.5"}
+  [x]
+  (clojure.lang.Reduced. x))
+
+(defn reduced?
+  "Returns true if x is the result of a call to reduced"
+  {:inline (fn [x] `(clojure.lang.RT/isReduced ~x ))
+   :inline-arities #{1}
+   :added "1.5"}
+  ([x] (clojure.lang.RT/isReduced x)))
 
 (defn ensure-reduced
   "If x is already reduced?, returns it, else returns (reduced x)"
@@ -7646,6 +7639,13 @@ fails, attempts to require sym's namespace and retries."
        ~(if (empty? steps)
           g
           (last steps)))))
+
+(defn ^:private preserving-reduced
+  [rf]
+  #(let [ret (rf %1 %2)]
+     (if (reduced? ret)
+       (reduced ret)
+       ret)))
 
 (defn cat
   "A transducer which concatenates the contents of each input, which must be a
