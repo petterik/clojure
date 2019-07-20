@@ -4331,9 +4331,7 @@
                   (rf result input)
                   result)))))))
   ([n coll]
-     (lazy-seq
-      (when-let [s (seq coll)]
-        (cons (first s) (take-nth n (drop n s)))))))
+   (lazy-seq-2 (take-nth n) coll)))
 
 (defn interleave
   "Returns a lazy seq of the first item in each coll, then the second etc."
