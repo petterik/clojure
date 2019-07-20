@@ -5243,7 +5243,7 @@
               (vreset! started true)
               (rf result input))))))))
   ([sep coll]
-   (drop 1 (interleave (repeat sep) coll))))
+   (lazy-seq-2 (interpose sep) coll)))
 
 (defmacro definline
   "Experimental - like defmacro, except defines a named function whose
