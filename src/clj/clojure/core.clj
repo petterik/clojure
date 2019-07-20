@@ -7379,21 +7379,7 @@ fails, attempts to require sym's namespace and retries."
               result
               (rf result v)))))))
   ([f coll]
-   (lazy-seq
-    (when-let [s (seq coll)]
-      (if (chunked-seq? s)
-        (let [c (chunk-first s)
-              size (count c)
-              b (chunk-buffer size)]
-          (dotimes [i size]
-            (let [x (f (.nth c i))]
-              (when-not (nil? x)
-                (chunk-append b x))))
-          (chunk-cons (chunk b) (keep f (chunk-rest s))))
-        (let [x (f (first s))]
-          (if (nil? x)
-            (keep f (rest s))
-            (cons x (keep f (rest s))))))))))
+   (lazy-seq-2 (keep f) coll)))
 
 (defn keep-indexed
   "Returns a lazy sequence of the non-nil results of (f index item). Note,
