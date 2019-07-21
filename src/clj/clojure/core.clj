@@ -7284,7 +7284,9 @@ fails, attempts to require sym's namespace and retries."
                 (rf result v))
               result))))))
   ([n coll]
-     (lazy-seq-2 (partition-all n) coll))
+   ;; TODO: Needs test to show that {:n 1/2 :coll [1 1]} used to be [[1] [1]]
+   (let [n (if (integer? n) n (Math/round (double n)))]
+     (lazy-seq-2 (partition-all n) coll)))
   ([n step coll]
      (lazy-seq
       (when-let [s (seq coll)]
