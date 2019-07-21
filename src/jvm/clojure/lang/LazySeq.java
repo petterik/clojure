@@ -82,7 +82,9 @@ private static IFn clojureEduction() {
 
 public IReduceInit reducible() {
 	if (xf != null) {
-		IReduceInit reducible = (IReduceInit)clojureEduction().invoke(xf, coll);
+		// Recursively call reducible on coll if possible.
+		Object root = coll instanceof Reducible ? ((Reducible) coll).reducible() : coll;
+		IReduceInit reducible = (IReduceInit)clojureEduction().invoke(xf, root);
 		xf = null;
 		coll = REDUCED_SEQ;
 		if (isStrictlyReducible()) {
