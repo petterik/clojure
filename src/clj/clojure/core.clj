@@ -4331,7 +4331,11 @@
                   (rf result input)
                   result)))))))
   ([n coll]
-   (lazy-seq-2 (take-nth n) coll)))
+   ;; TODO Backcompat: Test non-pos integers repeat the first character forever.
+   ;; (take 3 (take-nth 0 [1 2])) => (1 1 1)
+   (if (pos? n)
+     (lazy-seq-2 (take-nth n) coll)
+     (repeat (first coll)))))
 
 (defn interleave
   "Returns a lazy seq of the first item in each coll, then the second etc."
