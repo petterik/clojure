@@ -1849,6 +1849,14 @@ static public boolean isReduced(Object r){
 	return r instanceof Reduced;
 }
 
+static public Object asConsumable(Object o) {
+	Object c;
+	if (o instanceof clojure.lang.Consumable
+			&& (c = ((clojure.lang.Consumable) o).consumable()) != null)
+		return c;
+	return o;
+}
+
 static public String resolveClassNameInContext(String className){
 	//todo - look up in context var
 	return className;

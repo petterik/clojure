@@ -7692,16 +7692,14 @@ fails, attempts to require sym's namespace and retries."
       (print-sequential "(" pr-on " " ")" c w))
     (print-object c w)))
 
-(defn reducible!
-  "Takes a collection and returns a reducible version of the
-  collections. Usage of the returned  reducible may make the
+(defn consumable!
+  "Takes a collection and returns a consumable version of the
+  collections. Usage of the returned  consumable may make the
   original collection unusable as a sequence or in another
-  reducible context."
+  consumable context."
   {:added "RELEASE"}
   [coll]
-  (or (when (instance? clojure.lang.Reducible coll)
-        (.reducible ^clojure.lang.Reducible coll))
-    coll))
+  (clojure.lang.RT/asConsumable coll))
 
 (defn run!
   "Runs the supplied procedure (via reduce), for purposes of side

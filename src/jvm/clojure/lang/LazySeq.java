@@ -14,13 +14,13 @@ package clojure.lang;
 
 import java.util.*;
 
-public final class LazySeq extends Obj implements Reducible, ISeq, Sequential, List, IPending, IHashEq{
+public final class LazySeq extends Obj implements Consumable, ISeq, Sequential, List, IPending, IHashEq{
 
-private static final Keyword REDUCED_SEQ = Keyword.intern("clojure.lang.LazySeq", "REDUCED_SEQ");
-private static final Var STRICT_REDUCIBLE_SEQS = RT.var("clojure.lang.LazySeq","*strict-reducible-seqs*").setDynamic();
+private static final Keyword CONSUMED_SEQ = Keyword.intern("clojure.lang.LazySeq", "CONSUMED_SEQ");
+private static final Var STRICT_CONSUMABLE_SEQS = RT.var("clojure.lang.LazySeq","*strict-consumable-seqs*").setDynamic();
 
 static {
-	STRICT_REDUCIBLE_SEQS.doReset(true);
+	STRICT_CONSUMABLE_SEQS.doReset(true);
 }
 
 private IFn fn;
@@ -52,13 +52,13 @@ public Obj withMeta(IPersistentMap meta){
 	return new LazySeq(meta, seq());
 }
 
-private static boolean isStrictlyReducible(){
-	return (boolean)STRICT_REDUCIBLE_SEQS.get();
+private static boolean isStrictlyConsumable(){
+	return (boolean) STRICT_CONSUMABLE_SEQS.get();
 }
 private void ensureNotReduced(){
-	if (coll == REDUCED_SEQ) {
-		if (isStrictlyReducible()) {
-			throw new RuntimeException("LazySeq's internals were destroyed when used as a Reducible");
+	if (coll == CONSUMED_SEQ) {
+		if (isStrictlyConsumable()) {
+			throw new RuntimeException("LazySeq's internals were destroyed when used as a Consumable");
 		} else {
 			System.err.println("WARN: Reduced seq is being reused");
 			new Exception().printStackTrace();
@@ -80,20 +80,20 @@ private static IFn clojureEduction() {
 	return CLOJURE_EDUCTION;
 }
 
-public IReduceInit reducible() {
+public IReduceInit consumable() {
 	if (xf != null) {
-		// Recursively call reducible on coll if possible.
-		Object root = coll instanceof Reducible ? ((Reducible) coll).reducible() : coll;
-		IReduceInit reducible = (IReduceInit)clojureEduction().invoke(xf, root);
+		// Recursively call consumable on coll if possible.
+		Object root = clojure.lang.RT.asConsumable(coll);
+		IReduceInit consumable = (IReduceInit)clojureEduction().invoke(xf, root);
 		xf = null;
-		coll = REDUCED_SEQ;
-		if (isStrictlyReducible()) {
+		coll = CONSUMED_SEQ;
+		if (isStrictlyConsumable()) {
 			// Remove the reference to the seq value when strictly
 			// enforcing the sequence not being seqable again, to
 			// help the gc.
 			sv = null;
 		}
-		return reducible;
+		return consumable;
 	} else {
 		ensureNotReduced();
 		return null;
@@ -105,12 +105,12 @@ final synchronized Object sval(){
 		sv = fn.invoke();
 		fn = null;
 	} else {
-		// There was no function, it might be a reducible lazy seq.
-		// Reducible seq's coll is either a coll or the REDUCIBLE_SEQ value.
+		// There was no function, it might be a consumable lazy seq.
+		// Consumable seq's coll is either a coll or the CONSUMABLE_SEQ value.
 		// i.e. not null.
 		if (coll != null) {
 			// Ensure the collection was not reduced and safely null out
-			// the reducible parts of the sequence.
+			// the consumable parts of the sequence.
 			ensureNotReduced();
 			xf = null;
 			coll = null;
