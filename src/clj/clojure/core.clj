@@ -1498,6 +1498,7 @@
                       1 [1 (cons (.get buf 0) nil)]}
                      :compact
                      :int))))]
+    ;; TODO: Why is (->> (range 1e6) (map str) (mapcat seq) (map int)) so slow?
     (fn [xform coll]
       (lazy-seq
         (let [s (seq coll)]
