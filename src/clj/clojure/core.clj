@@ -1468,26 +1468,24 @@
                  (let [chunked? (chunked-seq? s)
                        ret (if chunked?
                              (.reduce (chunk-first s) xf buf)
-                             (xf buf (first s)))]
-                   (if (clojure.lang.RT/isReduced ret)
-                     ;; TODO: is the reduced ret always buf?
-                     (recur nil xf (.deref ^clojure.lang.Reduced ret))
-                     (let [s (if chunked? (chunk-rest s) (rest s))
+                             (xf buf (.first ^clojure.lang.ISeq s)))]
+                   (if (identical? buf ret)
+                     (let [^clojure.lang.ISeq s (if chunked? (chunk-rest s) (.more ^clojure.lang.ISeq s))
                            size (.size buf)]
                        (case* size 0 0
                          ;; else
                          (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
                            (lazy-seq
-                             (.clear buf)
-                             (self (seq s) xf buf)))
+                             (self (.seq s) xf (do (.clear buf) buf))))
                          ;; cases
-                         {0 [0 (recur (seq s) xf buf)]
+                         {0 [0 (recur (.seq s) xf buf)]
                           1 [1 (cons (.get buf 0)
                                  (lazy-seq
-                                   (.clear buf)
-                                   (self (seq s) xf buf)))]}
+                                   (self (.seq s) xf (do (.clear buf) buf))))]}
                          :compact
-                         :int))))
+                         :int))
+                     ;; if buf and ret were not identical, it's a reduced value.
+                     (recur nil xf (.deref ^clojure.lang.Reduced ret))))
                  (let [^java.util.ArrayList buf (xf buf)
                        size (.size buf)]
                    (case* size 0 0
