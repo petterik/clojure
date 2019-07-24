@@ -1465,29 +1465,42 @@
                      buf))
         step (fn self [s xf ^java.util.ArrayList buf]
                (if s
-                 (let [chunked? (chunked-seq? s)
-                       ret (if chunked?
-                             (.reduce (chunk-first s) xf buf)
-                             (xf buf (.first ^clojure.lang.ISeq s)))]
-                   (if (identical? buf ret)
-                     (let [^clojure.lang.ISeq s (if chunked? (chunk-rest s) (.more ^clojure.lang.ISeq s))
-                           size (.size buf)]
-                       (case* size 0 0
-                         ;; else
-                         (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
-                           (lazy-seq
-                             (self (.seq s) xf (do (.clear buf) buf))))
-                         ;; cases
-                         {0 [0 (recur (.seq s) xf buf)]
-                          1 [1 (cons (.get buf 0)
-                                 (lazy-seq
-                                   (self (.seq s) xf (do (.clear buf) buf))))]}
-                         :compact
-                         :int))
-                     ;; if buf and ret were not identical, it's a reduced value.
-                     (recur nil xf (.deref ^clojure.lang.Reduced ret))))
-                 (let [^java.util.ArrayList buf (xf buf)
-                       size (.size buf)]
+                 (if (chunked-seq? s)
+                   (let [ret (.reduce (chunk-first s) xf buf)]
+                     (if (clojure.lang.RT/isReduced ret)
+                       (recur nil xf (.deref ^clojure.lang.Reduced ret))
+                       (let [^clojure.lang.ISeq s (chunk-rest s)]
+                         (let [size (.size buf)]
+                           (case* size 0 0
+                             ;; else
+                             (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
+                               (lazy-seq
+                                 (self (.seq s) xf (do (.clear buf) buf))))
+                             ;; cases
+                             {0 [0 (recur (.seq s) xf buf)]
+                              1 [1 (cons (.get buf 0)
+                                     (lazy-seq
+                                       (self (.seq s) xf (do (.clear buf) buf))))]}
+                             :compact
+                             :int)))))
+                   (let [ret (xf buf (.first ^clojure.lang.ISeq s))]
+                     (if (clojure.lang.RT/isReduced ret)
+                       (recur nil xf (.deref ^clojure.lang.Reduced ret))
+                       (let [^clojure.lang.ISeq s (.more s)]
+                         (let [size (.size buf)]
+                           (case* size 0 0
+                             ;; else
+                             (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
+                               (lazy-seq
+                                 (self (.seq s) xf (do (.clear buf) buf))))
+                             ;; cases
+                             {0 [0 (recur (.seq s) xf buf)]
+                              1 [1 (cons (.get buf 0)
+                                     (lazy-seq
+                                       (self (.seq s) xf (do (.clear buf) buf))))]}
+                             :compact
+                             :int))))))
+                 (let [size (.size (do (xf buf) buf))]
                    (case* size 0 0
                      ;; else
                      (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf)) nil)
