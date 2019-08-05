@@ -1472,46 +1472,11 @@
 ;; The filtering xf's is the only thing I can think of that can
 ;; actually be optimized with a transducer + recur.
 
+(def ^:static ^:const chunked-seq-class clojure.lang.IChunkedSeq)
+
 (defn ^:private ^:static xf-seq-step
   [^clojure.lang.ISeq s ^clojure.lang.IFn xf ^java.util.ArrayList buf]
-  (if s
-    (if (chunked-seq? s)
-      (if (identical? buf (.reduce (chunk-first ^clojure.lang.IChunkedSeq s) xf buf))
-        (let [size (.size buf)]
-          (case* size 0 0
-            ;;else
-            (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
-              (do
-                (.clear buf)
-                (lazy-seq
-                  (xf-seq-step (chunk-next ^clojure.lang.IChunkedSeq s) xf buf))))
-            {0 [0 (recur (chunk-next ^clojure.lang.IChunkedSeq s) xf buf)]
-             1 [1 (clojure.lang.Cons. (.get buf 0)
-                    (do
-                      (.clear buf)
-                      (lazy-seq
-                        (xf-seq-step (chunk-next ^clojure.lang.IChunkedSeq s) xf buf))))]}
-            :compact
-            :int))
-        (recur nil xf buf))
-      (if (identical? buf (xf buf (.first s)))
-        (let [size (.size buf)]
-          (case* size 0 0
-            (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
-              (do
-                (.clear buf)
-                (lazy-seq
-                  (xf-seq-step (.next s) xf buf))))
-            {0 [0 (recur (.next s) xf buf)]
-             1 [1 (clojure.lang.Cons.
-                    (.get buf 0)
-                    (do
-                      (.clear buf)
-                      (lazy-seq
-                        (xf-seq-step (.next s) xf buf))))]}
-            :compact
-            :int))
-        (recur nil xf buf)))
+  (if (identical? s nil)
     (do
       (xf buf)
       (let [size (.size buf)]
@@ -1522,7 +1487,28 @@
           {0 [0 nil]
            1 [1 (clojure.lang.Cons. (.get buf 0) nil)]}
           :compact
-          :int)))))
+          :int)))
+    (let [s (if (.isInstance ^Class chunked-seq-class s)
+              (if (identical? buf (.reduce (chunk-first ^clojure.lang.IChunkedSeq s) xf buf))
+                (chunk-rest ^clojure.lang.IChunkedSeq s)
+                ())
+              (if (identical? buf (xf buf (.first s)))
+                (.more s)
+                ()))
+          size (.size buf)]
+      (case* size 0 0
+        (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
+          (lazy-seq
+            (.clear buf)
+            (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf)))
+        {0 [0 (lazy-seq
+                (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf))]
+         1 [1 (clojure.lang.Cons. (.get buf 0)
+                (lazy-seq
+                  (.clear buf)
+                  (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf)))]}
+        :compact
+        :int))))
 
 (def ^:static xf-seq-arr-conj!
   (fn
