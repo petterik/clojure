@@ -1456,65 +1456,88 @@
 
 ;;Collection stuff
 
+;; Idea, create different versions of xf-seq
+;; the different ones:
+;; * Halting/non-halting
+;; * Completing/non-completing (1-arity)
+;; * Multiple calls to rf, not.
+
+;; We can do these optimizations because we know what the xf is.
+;; It's never composed with other xfs.
+
+;; Full stop!
+
+;; But when the above is the case, why bother?
+;; Maybe just use the already existing, optimized, lazy-seqs?
+;; The filtering xf's is the only thing I can think of that can
+;; actually be optimized with a transducer + recur.
+
+(defn ^:private ^:static xf-seq-step
+  [^clojure.lang.ISeq s ^clojure.lang.IFn xf ^java.util.ArrayList buf]
+  (if s
+    (if (chunked-seq? s)
+      (if (identical? buf (.reduce (chunk-first ^clojure.lang.IChunkedSeq s) xf buf))
+        (let [size (.size buf)]
+          (case* size 0 0
+            ;;else
+            (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
+              (do
+                (.clear buf)
+                (lazy-seq
+                  (xf-seq-step (chunk-next ^clojure.lang.IChunkedSeq s) xf buf))))
+            {0 [0 (recur (chunk-next ^clojure.lang.IChunkedSeq s) xf buf)]
+             1 [1 (clojure.lang.Cons. (.get buf 0)
+                    (do
+                      (.clear buf)
+                      (lazy-seq
+                        (xf-seq-step (chunk-next ^clojure.lang.IChunkedSeq s) xf buf))))]}
+            :compact
+            :int))
+        (recur nil xf buf))
+      (if (identical? buf (xf buf (.first s)))
+        (let [size (.size buf)]
+          (case* size 0 0
+            (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
+              (do
+                (.clear buf)
+                (lazy-seq
+                  (xf-seq-step (.next s) xf buf))))
+            {0 [0 (recur (.next s) xf buf)]
+             1 [1 (clojure.lang.Cons.
+                    (.get buf 0)
+                    (do
+                      (.clear buf)
+                      (lazy-seq
+                        (xf-seq-step (.next s) xf buf))))]}
+            :compact
+            :int))
+        (recur nil xf buf)))
+    (do
+      (xf buf)
+      (let [size (.size buf)]
+        (case* size 0 0
+          ;; else
+          (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf)) nil)
+          ;; cases
+          {0 [0 nil]
+           1 [1 (clojure.lang.Cons. (.get buf 0) nil)]}
+          :compact
+          :int)))))
+
+(def ^:static xf-seq-arr-conj!
+  (fn
+    ([] (java.util.ArrayList.))
+    ([buf] buf)
+    ([buf x]
+     (.add ^java.util.ArrayList buf x)
+     buf)))
+
 (def ^:static xf-seq
-  (let [arr-conj! (fn
-                    ([] (java.util.ArrayList.))
-                    ([buf] buf)
-                    ([^java.util.ArrayList buf x]
-                     (.add buf x)
-                     buf))
-        step (fn self [s xf ^java.util.ArrayList buf]
-               (if s
-                 (if (chunked-seq? s)
-                   (let [ret (.reduce (chunk-first s) xf buf)]
-                     (if (clojure.lang.RT/isReduced ret)
-                       (recur nil xf (.deref ^clojure.lang.Reduced ret))
-                       (let [^clojure.lang.ISeq s (chunk-rest s)]
-                         (let [size (.size buf)]
-                           (case* size 0 0
-                             ;; else
-                             (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
-                               (lazy-seq
-                                 (self (.seq s) xf (do (.clear buf) buf))))
-                             ;; cases
-                             {0 [0 (recur (.seq s) xf buf)]
-                              1 [1 (cons (.get buf 0)
-                                     (lazy-seq
-                                       (self (.seq s) xf (do (.clear buf) buf))))]}
-                             :compact
-                             :int)))))
-                   (let [ret (xf buf (.first ^clojure.lang.ISeq s))]
-                     (if (clojure.lang.RT/isReduced ret)
-                       (recur nil xf (.deref ^clojure.lang.Reduced ret))
-                       (let [^clojure.lang.ISeq s (.more s)]
-                         (let [size (.size buf)]
-                           (case* size 0 0
-                             ;; else
-                             (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
-                               (lazy-seq
-                                 (self (.seq s) xf (do (.clear buf) buf))))
-                             ;; cases
-                             {0 [0 (recur (.seq s) xf buf)]
-                              1 [1 (cons (.get buf 0)
-                                     (lazy-seq
-                                       (self (.seq s) xf (do (.clear buf) buf))))]}
-                             :compact
-                             :int))))))
-                 (let [size (.size (do (xf buf) buf))]
-                   (case* size 0 0
-                     ;; else
-                     (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf)) nil)
-                     ;; cases
-                     {0 [0 nil]
-                      1 [1 (cons (.get buf 0) nil)]}
-                     :compact
-                     :int))))]
-    ;; TODO: Why is (->> (range 1e6) (map str) (mapcat seq) (map int)) so slow?
-    (fn [xform coll]
-      (lazy-seq
-        (let [s (seq coll)]
-          (when s
-            (step s (xform arr-conj!) (java.util.ArrayList. 4))))))))
+  (fn xf-seq [xform coll]
+    (lazy-seq
+      (let [s (seq coll)]
+        (if s
+          (xf-seq-step s (xform xf-seq-arr-conj!) (java.util.ArrayList. 4)))))))
 
 (defn lazy-seq-2
   ([xf coll]
