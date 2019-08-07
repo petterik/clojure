@@ -1485,7 +1485,7 @@
                 (if (identical? buf (.reduce ch xf (.scope buf (.count ch))))
                   (chunk-rest ^clojure.lang.IChunkedSeq s)
                   ()))
-              (if (identical? buf (xf (.scope buf) (.first s)))
+              (if (identical? buf (xf buf (.first s)))
                 (.more s)
                 ()))]
       (.toSeq buf
