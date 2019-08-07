@@ -45,6 +45,13 @@ public class XFSeqDynamicBuffer2 {
             case 1:
                 idx = 0;
                 return new Cons(arr[0], more);
+            case 2:
+                // TODO: Verify whether handrolling these arities is a good idea.
+                idx = 0;
+                return new Cons(arr[0], new Cons(arr[1], more));
+            case 3:
+                idx = 0;
+                return new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more)));
             default:
                 Object[] chunk = arr;
                 int end = idx;
