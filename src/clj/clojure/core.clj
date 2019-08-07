@@ -1475,55 +1475,36 @@
 (def ^:static ^:const chunked-seq-class clojure.lang.IChunkedSeq)
 
 (defn ^:private ^:static xf-seq-step
-  [^clojure.lang.ISeq s ^clojure.lang.IFn xf ^java.util.ArrayList buf]
+  [^clojure.lang.ISeq s ^clojure.lang.IFn xf ^clojure.lang.XFSeqDynamicBuffer2 buf]
   (if (identical? s nil)
     (do
-      (xf buf)
-      (let [size (.size buf)]
-        (case* size 0 0
-          ;; else
-          (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf)) nil)
-          ;; cases
-          {0 [0 nil]
-           1 [1 (clojure.lang.Cons. (.get buf 0) nil)]}
-          :compact
-          :int)))
+      (xf (.scope buf))
+      (.toSeq buf nil))
     (let [s (if (.isInstance ^Class chunked-seq-class s)
-              (if (identical? buf (.reduce (chunk-first ^clojure.lang.IChunkedSeq s) xf buf))
-                (chunk-rest ^clojure.lang.IChunkedSeq s)
-                ())
-              (if (identical? buf (xf buf (.first s)))
+              (let [ch (chunk-first ^clojure.lang.IChunkedSeq s)]
+                (if (identical? buf (.reduce ch xf (.scope buf (.count ch))))
+                  (chunk-rest ^clojure.lang.IChunkedSeq s)
+                  ()))
+              (if (identical? buf (xf (.scope buf) (.first s)))
                 (.more s)
-                ()))
-          size (.size buf)]
-      (case* size 0 0
-        (clojure.lang.ChunkedCons. (clojure.lang.ArrayChunk. (.toArray buf))
-          (lazy-seq
-            (.clear buf)
-            (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf)))
-        {0 [0 (lazy-seq
-                (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf))]
-         1 [1 (clojure.lang.Cons. (.get buf 0)
-                (lazy-seq
-                  (.clear buf)
-                  (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf)))]}
-        :compact
-        :int))))
+                ()))]
+      (.toSeq buf
+        (lazy-seq
+          (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf))))))
 
 (def ^:static xf-seq-arr-conj!
   (fn
-    ([] (java.util.ArrayList.))
+    ([] (clojure.lang.XFSeqDynamicBuffer2.))
     ([buf] buf)
     ([buf x]
-     (.add ^java.util.ArrayList buf x)
-     buf)))
+     (.conj ^clojure.lang.XFSeqDynamicBuffer2 buf x))))
 
 (def ^:static xf-seq
   (fn xf-seq [xform coll]
     (lazy-seq
       (let [s (seq coll)]
         (if s
-          (xf-seq-step s (xform xf-seq-arr-conj!) (java.util.ArrayList. 4)))))))
+          (xf-seq-step s (xform xf-seq-arr-conj!) (clojure.lang.XFSeqDynamicBuffer2.)))))))
 
 (defn lazy-seq-2
   ([xf coll]
