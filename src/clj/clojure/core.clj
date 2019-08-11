@@ -1472,39 +1472,8 @@
 ;; The filtering xf's is the only thing I can think of that can
 ;; actually be optimized with a transducer + recur.
 
-(def ^:static ^:const chunked-seq-class clojure.lang.IChunkedSeq)
-
-(defn ^:private ^:static xf-seq-step
-  [^clojure.lang.ISeq s ^clojure.lang.IFn xf ^clojure.lang.XFSeqDynamicBuffer2 buf]
-  (if (identical? s nil)
-    (do
-      (xf (.scope buf))
-      (.toSeq buf nil))
-    (let [s (if (.isInstance ^Class chunked-seq-class s)
-              (let [ch (chunk-first ^clojure.lang.IChunkedSeq s)]
-                (if (identical? buf (.reduce ch xf (.scope buf (.count ch))))
-                  (chunk-rest ^clojure.lang.IChunkedSeq s)
-                  ()))
-              (if (identical? buf (xf buf (.first s)))
-                (.more s)
-                ()))]
-      (.toSeq buf
-        (lazy-seq
-          (xf-seq-step (.seq ^clojure.lang.ISeq s) xf buf))))))
-
-(def ^:static xf-seq-arr-conj!
-  (fn
-    ([] (clojure.lang.XFSeqDynamicBuffer2.))
-    ([buf] buf)
-    ([buf x]
-     (.conj ^clojure.lang.XFSeqDynamicBuffer2 buf x))))
-
-(def ^:static xf-seq
-  (fn xf-seq [xform coll]
-    (lazy-seq
-      (let [s (seq coll)]
-        (if s
-          (xf-seq-step s (xform xf-seq-arr-conj!) (clojure.lang.XFSeqDynamicBuffer2.)))))))
+(defn xf-seq [xf coll]
+  (clojure.lang.XFSeq/create xf coll))
 
 (defn lazy-seq-2
   ([xf coll]

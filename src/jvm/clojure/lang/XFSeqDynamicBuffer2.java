@@ -1,6 +1,6 @@
 package clojure.lang;
 
-public class XFSeqDynamicBuffer2 {
+public class XFSeqDynamicBuffer2 extends AFn {
 
     private static final int MIN_SIZE = 8;
     private static final int GROWTH_MULTIPLIER = 2;
@@ -59,5 +59,19 @@ public class XFSeqDynamicBuffer2 {
                 idx = 0;
                 return new ChunkedCons(new ArrayChunk(chunk, 0, end), more);
         }
+    }
+
+    // Implements a reducing function (arities 0, 1, 2)
+    public Object invoke() {
+        return new XFSeqDynamicBuffer2();
+    }
+
+    public Object invoke(Object a) {
+        return a;
+    }
+
+    public Object invoke(Object a, Object b) {
+        // assert(a == this);
+        return this.conj(b);
     }
 }
