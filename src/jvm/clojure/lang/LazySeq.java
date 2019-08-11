@@ -28,16 +28,18 @@ private Object sv;
 private ISeq s;
 private IFn xf;
 private Object coll;
+private boolean stackable;
 
 public LazySeq(IFn fn){
 	this.fn = fn;
 }
 
-public LazySeq(IFn xf, Object coll, Object ls) {
+public LazySeq(IFn xf, Object coll, Object ls, boolean stackable) {
 	this.fn = null;
 	this.xf = xf;
 	this.coll = coll;
 	this.sv = ls;
+	this.stackable = stackable;
 }
 
 private LazySeq(IPersistentMap meta, ISeq s){
@@ -80,8 +82,26 @@ private static IFn clojureEduction() {
 	return CLOJURE_EDUCTION;
 }
 
+public synchronized ISeq stack(IFn xform) {
+	// A LazySeq is stackable when there's an xform which
+	// behaves the same whether it's composed iwth
+	if (xf != null && stackable) {
+		ISeq s = clojure.lang.RT.stackSeqs(xform, xf, coll);
+		xf = null;
+		coll = CONSUMED_SEQ;
+		if (isStrictlyConsumable()) {
+			sv = null;
+		}
+		return s;
+	} else {
+		return null;
+	}
+}
+
 public IReduceInit consumable() {
 	if (xf != null) {
+		// TODO - Implement clojure.lang.Eduction
+		//        Also maybe punt on that?
 		// Recursively call consumable on coll if possible.
 		Object root = clojure.lang.RT.asConsumable(coll);
 		IReduceInit consumable = (IReduceInit)clojureEduction().invoke(xf, root);

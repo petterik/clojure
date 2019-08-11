@@ -1857,6 +1857,36 @@ static public Object asConsumable(Object o) {
 	return o;
 }
 
+static public Object asStackedSeq(Object o) {
+	Object s;
+	if (o instanceof clojure.lang.Consumable
+			&& (s = ((clojure.lang.Consumable) o).stack(null)) != null)
+		return s;
+	return o;
+}
+
+static ISeq stackSeqs(IFn xform1, IFn xform2, Object coll) {
+	IFn xform;
+	if (xform1 == null) {
+		xform = xform2;
+	} else {
+		xform = new AFn() {
+			@Override
+			public Object invoke(Object rf) {
+				// TODO, reverse order of xform invokation?
+				return xform2.invoke(xform1.invoke(rf));
+			}
+		};
+	}
+	ISeq s;
+	if (coll instanceof clojure.lang.Consumable
+			&& (s = ((clojure.lang.Consumable)coll).stack(xform)) != null) {
+		return s;
+	} else {
+		return clojure.lang.XFSeq.create(xform, coll);
+	}
+}
+
 static public String resolveClassNameInContext(String className){
 	//todo - look up in context var
 	return className;

@@ -42,8 +42,8 @@ package clojure.lang;
 public class XFSeq {
 
     private static class InitLazySeq extends AFn {
-        private final IFn xf;
-        private final Object coll;
+        private IFn xf;
+        private Object coll;
 
         InitLazySeq(IFn xf, Object coll) {
             this.xf = xf;
@@ -53,21 +53,24 @@ public class XFSeq {
         @Override
         public Object invoke() {
             ISeq s = RT.seq(coll);
-            if (s == null) {
-                return null;
-            } else {
+            if (s != null) {
                 XFSeqDynamicBuffer2 buf = new XFSeqDynamicBuffer2();
                 IFn xform = (IFn)xf.invoke(buf);
-                return step(s, xform, buf);
+                xf = null;
+                coll = null;
+                s = step(s, xform, buf);
             }
+            xf = null;
+            coll = null;
+            return s;
         };
     }
 
     private static class NextStep extends AFn {
 
-        private final ISeq s;
-        private final IFn xf;
-        private final XFSeqDynamicBuffer2 buf;
+        private ISeq s;
+        private IFn xf;
+        private XFSeqDynamicBuffer2 buf;
 
         NextStep(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf) {
             this.s = s;
@@ -76,14 +79,21 @@ public class XFSeq {
         }
 
         public Object invoke() {
-            return step(s.seq(), xf, buf);
+            ISeq c = s.seq();
+            IFn x = xf;
+            XFSeqDynamicBuffer2 b = buf;
+            s = null;
+            xf = null;
+            buf = null;
+            return step(c, x, b);
         }
     }
 
     private static ISeq step(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf) {
+        ISeq ret;
         if (s == null) {
             xf.invoke(buf.scope());
-            return buf.toSeq(null);
+            ret = buf.toSeq(null);
         } else {
             ISeq s2;
             if (s instanceof IChunkedSeq) {
@@ -100,8 +110,9 @@ public class XFSeq {
                     s2 = PersistentList.EMPTY;
                 }
             }
-            return buf.toSeq(new LazySeq(new NextStep(s2, xf, buf)));
+            ret = buf.toSeq(new LazySeq(new NextStep(s2, xf, buf)));
         }
+        return ret;
     }
 
     public static ISeq create(IFn xform, Object coll) {

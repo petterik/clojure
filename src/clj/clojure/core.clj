@@ -1477,9 +1477,9 @@
 
 (defn lazy-seq-2
   ([xf coll]
-   (lazy-seq-2 xf coll (xf-seq xf coll)))
+   (clojure.lang.LazySeq. xf coll (xf-seq xf coll) true))
   ([xf coll ls]
-   (clojure.lang.LazySeq. xf coll ls)))
+   (clojure.lang.LazySeq. xf coll ls false)))
 
 ;;list stuff
 (defn peek
