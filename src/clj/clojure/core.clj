@@ -1472,12 +1472,9 @@
 ;; The filtering xf's is the only thing I can think of that can
 ;; actually be optimized with a transducer + recur.
 
-(defn xf-seq [xf coll]
-  (clojure.lang.XFSeq/create xf coll))
-
 (defn lazy-seq-2
   ([xf coll]
-   (clojure.lang.LazySeq. xf coll (xf-seq xf coll) true))
+   (clojure.lang.LazySeq. xf coll (clojure.lang.XFSeq/create xf coll) true))
   ([xf coll ls]
    (clojure.lang.LazySeq. xf coll ls false)))
 
@@ -2684,9 +2681,7 @@
      (if (seq? coll) coll
          (or (seq coll) ())))
   ([xform coll]
-     (or (clojure.lang.RT/chunkIteratorSeq
-         (clojure.lang.TransformerIterator/create xform (clojure.lang.RT/iter coll)))
-       ()))
+   (clojure.lang.XFSeq/create xform coll))
   ([xform coll & colls]
      (or (clojure.lang.RT/chunkIteratorSeq
          (clojure.lang.TransformerIterator/createMulti
@@ -7629,7 +7624,7 @@ fails, attempts to require sym's namespace and retries."
 (deftype Eduction [xform coll]
    Iterable
    (iterator [_]
-     (clojure.lang.TransformerIterator/create xform (clojure.lang.RT/iter coll)))
+     (clojure.lang.XFSeq/create xform coll))
 
    clojure.lang.IReduceInit
    (reduce [_ f init]
