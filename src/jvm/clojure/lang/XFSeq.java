@@ -118,4 +118,8 @@ public class XFSeq {
     public static ISeq create(IFn xform, Object coll) {
         return new LazySeq(new InitLazySeq(xform, coll));
     }
+
+    public static ISeq createStackable(IFn xform, Object coll) {
+        return new LazySeq(xform, coll, create(xform, coll), true);
+    }
 }

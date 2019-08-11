@@ -1865,6 +1865,7 @@ static public Object asStackedSeq(Object o) {
 	return o;
 }
 
+// Called by seqs when stacking them. Produces a stackable sequence.
 static ISeq stackSeqs(IFn xform1, IFn xform2, Object coll) {
 	IFn xform;
 	if (xform1 == null) {
@@ -1883,7 +1884,7 @@ static ISeq stackSeqs(IFn xform1, IFn xform2, Object coll) {
 			&& (s = ((clojure.lang.Consumable)coll).stack(xform)) != null) {
 		return s;
 	} else {
-		return clojure.lang.XFSeq.create(xform, coll);
+		return clojure.lang.XFSeq.createStackable(xform, coll);
 	}
 }
 
