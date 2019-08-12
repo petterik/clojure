@@ -56,9 +56,7 @@ public class XFSeq {
             if (s != null) {
                 XFSeqDynamicBuffer2 buf = new XFSeqDynamicBuffer2();
                 IFn xform = (IFn)xf.invoke(buf);
-                xf = null;
-                coll = null;
-                s = step(s, xform, buf);
+                s = step(s, xform, buf, new NextStep(xform, buf));
             }
             xf = null;
             coll = null;
@@ -68,50 +66,59 @@ public class XFSeq {
 
     private static class NextStep extends AFn {
 
+        private final IFn xf;
+        private final XFSeqDynamicBuffer2 buf;
         private ISeq s;
-        private IFn xf;
-        private XFSeqDynamicBuffer2 buf;
 
-        NextStep(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf) {
-            this.s = s;
+        NextStep(IFn xf, XFSeqDynamicBuffer2 buf) {
             this.xf = xf;
             this.buf = buf;
         }
 
+        public void setSeq(ISeq s) {
+            this.s = s;
+        }
+
         public Object invoke() {
             ISeq c = s.seq();
-            IFn x = xf;
-            XFSeqDynamicBuffer2 b = buf;
             s = null;
-            xf = null;
-            buf = null;
-            return step(c, x, b);
+            return step(c, xf, buf, this);
         }
     }
 
-    private static ISeq step(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf) {
+    private static ISeq step(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf, NextStep ns) {
         ISeq ret;
-        if (s == null) {
-            xf.invoke(buf.scope());
-            ret = buf.toSeq(null);
-        } else {
-            ISeq s2;
-            if (s instanceof IChunkedSeq) {
-                IChunk ch = ((IChunkedSeq)s).chunkedFirst();
-                if (buf == ch.reduce(xf, (buf.scope(ch.count())))) {
-                    s2 = ((IChunkedSeq)s).chunkedMore();
-                } else {
-                    s2 = PersistentList.EMPTY;
-                }
+        LazySeq nextSeq = new LazySeq(ns);
+        while (true) {
+            if (s == null) {
+                xf.invoke(buf.scope());
+                ret = buf.toSeq(null);
+                break;
             } else {
-                if (buf == xf.invoke(buf, s.first())) {
-                    s2 = s.more();
+                if (s instanceof IChunkedSeq) {
+                    IChunk ch = ((IChunkedSeq) s).chunkedFirst();
+                    if (buf == ch.reduce(xf, (buf.scope(ch.count())))) {
+                        s = ((IChunkedSeq) s).chunkedMore();
+                    } else {
+                        s = PersistentList.EMPTY;
+                    }
                 } else {
-                    s2 = PersistentList.EMPTY;
+                    if (buf == xf.invoke(buf, s.first())) {
+                        s = s.more();
+                    } else {
+                        s = PersistentList.EMPTY;
+                    }
+                }
+                ns.setSeq(s);
+                ret = buf.toSeq(nextSeq);
+                if (ret == null) {
+                    s = s.seq();
+                } else {
+                    break;
                 }
             }
-            ret = buf.toSeq(new LazySeq(new NextStep(s2, xf, buf)));
         }
+
         return ret;
     }
 
