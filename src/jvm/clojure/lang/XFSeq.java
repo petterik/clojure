@@ -88,37 +88,27 @@ public class XFSeq {
 
     private static ISeq step(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf, NextStep ns) {
         ISeq ret;
-        LazySeq nextSeq = new LazySeq(ns);
-        while (true) {
-            if (s == null) {
-                xf.invoke(buf.scope());
-                ret = buf.toSeq(null);
-                break;
-            } else {
-                if (s instanceof IChunkedSeq) {
-                    IChunk ch = ((IChunkedSeq) s).chunkedFirst();
-                    if (buf == ch.reduce(xf, (buf.scope(ch.count())))) {
-                        s = ((IChunkedSeq) s).chunkedMore();
-                    } else {
-                        s = PersistentList.EMPTY;
-                    }
+        if (s == null) {
+            xf.invoke(buf.scope());
+            ret = buf.toSeq(null);
+        } else {
+            if (s instanceof IChunkedSeq) {
+                IChunk ch = ((IChunkedSeq) s).chunkedFirst();
+                if (buf == ch.reduce(xf, (buf.scope(ch.count())))) {
+                    s = ((IChunkedSeq) s).chunkedMore();
                 } else {
-                    if (buf == xf.invoke(buf, s.first())) {
-                        s = s.more();
-                    } else {
-                        s = PersistentList.EMPTY;
-                    }
+                    s = PersistentList.EMPTY;
                 }
-                ns.setSeq(s);
-                ret = buf.toSeq(nextSeq);
-                if (ret == null) {
-                    s = s.seq();
+            } else {
+                if (buf == xf.invoke(buf, s.first())) {
+                    s = s.more();
                 } else {
-                    break;
+                    s = PersistentList.EMPTY;
                 }
             }
+            ns.setSeq(s);
+            ret = buf.toSeq(new LazySeq(ns));
         }
-
         return ret;
     }
 

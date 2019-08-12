@@ -41,7 +41,7 @@ public class XFSeqDynamicBuffer2 extends AFn {
     public ISeq toSeq(ISeq more) {
         switch(idx) {
             case 0:
-                return null;
+                return more;
             case 1:
                 idx = 0;
                 return new Cons(arr[0], more);
