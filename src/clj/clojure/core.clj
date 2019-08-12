@@ -7622,9 +7622,13 @@ fails, attempts to require sym's namespace and retries."
      (filter (fn [_] (< (rand) prob)) coll)))
 
 (deftype Eduction [xform coll]
+   clojure.lang.Seqable
+   (seq [_]
+     (clojure.lang.XFSeq/create xform coll))
+
    Iterable
    (iterator [_]
-     (clojure.lang.XFSeq/create xform coll))
+     (clojure.lang.TransformerIterator/create xform (clojure.lang.RT/iter coll)))
 
    clojure.lang.IReduceInit
    (reduce [_ f init]
