@@ -2,8 +2,7 @@ package clojure.lang;
 
 public class XFSeqDynamicBuffer2 extends AFn {
 
-    private static final int MIN_SIZE = 8;
-    private static final int GROWTH_MULTIPLIER = 2;
+    private static final int MIN_SIZE = 2;
 
     private Object[] arr;
     private int idx;
@@ -29,7 +28,10 @@ public class XFSeqDynamicBuffer2 extends AFn {
 
     public XFSeqDynamicBuffer2 conj(Object o) {
         if (idx == arr.length) {
-            Object[] larger = new Object[idx * GROWTH_MULTIPLIER];
+            // Grows quickly to 32, then slows down.
+            // 2 * 4 * 4
+            int growth = idx <= 8 ? idx * 4 : idx * 2;
+            Object[] larger = new Object[idx * growth];
             System.arraycopy(arr, 0, larger, 0, idx);
             arr = larger;
         }
@@ -61,7 +63,7 @@ public class XFSeqDynamicBuffer2 extends AFn {
         }
     }
 
-    // Implements a reducing function (arities 0, 1, 2)
+    // Implements a reducing function (arities: 0, 1, 2)
     public Object invoke() {
         return new XFSeqDynamicBuffer2();
     }
