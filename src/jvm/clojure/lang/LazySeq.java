@@ -23,12 +23,14 @@ static {
 	STRICT_CONSUMABLE_SEQS.doReset(true);
 }
 
+private static boolean isStrictlyConsumable(){
+	return (boolean) STRICT_CONSUMABLE_SEQS.get();
+}
+
 private IFn fn;
 private Object sv;
 private ISeq s;
-private IFn xf;
-private Object coll;
-private boolean stackable;
+private ConsumableInternals ci;
 
 public LazySeq(IFn fn){
 	this.fn = fn;
@@ -36,10 +38,8 @@ public LazySeq(IFn fn){
 
 public LazySeq(IFn xf, Object coll, Object ls, boolean stackable) {
 	this.fn = null;
-	this.xf = xf;
-	this.coll = coll;
 	this.sv = ls;
-	this.stackable = stackable;
+	this.ci = stackable ? new StackableInternals(xf, coll) : new ConsumableInternals(xf, coll);
 }
 
 private LazySeq(IPersistentMap meta, ISeq s){
@@ -54,28 +54,10 @@ public Obj withMeta(IPersistentMap meta){
 	return new LazySeq(meta, seq());
 }
 
-private static boolean isStrictlyConsumable(){
-	return (boolean) STRICT_CONSUMABLE_SEQS.get();
-}
-private void ensureNotReduced(){
-	if (coll == CONSUMED_SEQ) {
-		if (isStrictlyConsumable()) {
-			throw new RuntimeException("LazySeq's internals were destroyed when used as a Consumable");
-		} else {
-			System.err.println("WARN: Reduced seq is being reused");
-			new Exception().printStackTrace();
-		}
-	}
-}
-
 public synchronized ISeq stack(IFn xform) {
-	// A LazySeq is stackable when there's an xform which
-	// behaves the same whether it's composed iwth
-	if (xf != null && stackable) {
-		ISeq s = clojure.lang.RT.stackSeqs(xform, xf, coll);
-		xf = null;
-		coll = CONSUMED_SEQ;
-		if (isStrictlyConsumable()) {
+	if (ci != null) {
+		ISeq s = ci.stack(xform);
+		if (s != null && isStrictlyConsumable()) {
 			sv = null;
 		}
 		return s;
@@ -84,24 +66,17 @@ public synchronized ISeq stack(IFn xform) {
 	}
 }
 
-public IReduceInit consumable() {
-	if (xf != null) {
-		// TODO - Implement clojure.lang.Eduction
-		//        Also maybe punt on that?
-		// Recursively call consumable on coll if possible.
-		Object root = clojure.lang.RT.asConsumable(coll);
-		IReduceInit consumable = new Eduction(xf, root);
-		xf = null;
-		coll = CONSUMED_SEQ;
-		if (isStrictlyConsumable()) {
+public synchronized IReduceInit consumable() {
+	if (ci != null) {
+		IReduceInit ret = ci.consumable();
+		if (ret != null && isStrictlyConsumable()) {
 			// Remove the reference to the seq value when strictly
 			// enforcing the sequence not being seqable again, to
 			// help the gc.
 			sv = null;
 		}
-		return consumable;
+		return ret;
 	} else {
-		ensureNotReduced();
 		return null;
 	}
 }
@@ -114,12 +89,11 @@ final synchronized Object sval(){
 		// There was no function, it might be a consumable lazy seq.
 		// Consumable seq's coll is either a coll or the CONSUMABLE_SEQ value.
 		// i.e. not null.
-		if (coll != null) {
+		if (ci != null) {
 			// Ensure the collection was not reduced and safely null out
 			// the consumable parts of the sequence.
-			ensureNotReduced();
-			xf = null;
-			coll = null;
+			ci.ensureNotReduced();
+			ci = null;
 		}
 	}
 	if(sv != null)
@@ -323,6 +297,70 @@ public boolean addAll(int index, Collection c){
 
 synchronized public boolean isRealized(){
 	return fn == null;
+}
+
+private static class ConsumableInternals implements Consumable {
+	private IFn xf;
+	private Object coll;
+
+	ConsumableInternals(IFn xf, Object coll) {
+		this.xf = xf;
+		this.coll = coll;
+	}
+
+	void ensureNotReduced(){
+		if (coll == CONSUMED_SEQ) {
+			if (isStrictlyConsumable()) {
+				throw new RuntimeException("LazySeq's internals were destroyed when used as a Consumable");
+			} else {
+				System.err.println("WARN: Reduced seq is being reused");
+				new Exception().printStackTrace();
+			}
+		}
+	}
+
+	@Override
+	public IReduceInit consumable() {
+		if (xf != null) {
+			// TODO - Implement clojure.lang.Eduction
+			//        Also maybe punt on that?
+			// Recursively call consumable on coll if possible.
+			Object root = clojure.lang.RT.asConsumable(coll);
+			IReduceInit consumable = new Eduction(xf, root);
+			xf = null;
+			coll = CONSUMED_SEQ;
+			return consumable;
+		} else {
+			ensureNotReduced();
+			return null;
+		}
+	}
+
+	@Override
+	public ISeq stack(IFn xf) {
+		return null;
+	}
+}
+
+private static class StackableInternals extends ConsumableInternals {
+
+	StackableInternals(IFn xf, Object coll) {
+		super(xf, coll);
+	}
+
+	@Override
+	public ISeq stack(IFn xform) {
+		// A LazySeq is stackable when there's an xform which
+		// behaves the same whether it's composed iwth
+		if (super.xf != null) {
+			ISeq s = clojure.lang.RT.stackSeqs(xform, super.xf, super.coll);
+			super.xf = null;
+			super.coll = CONSUMED_SEQ;
+			return s;
+		} else {
+			return null;
+		}
+	}
 }
 
 }
