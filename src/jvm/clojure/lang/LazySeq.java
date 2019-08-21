@@ -68,20 +68,6 @@ private void ensureNotReduced(){
 	}
 }
 
-private static final Object EDUCTION_LOCK = new Object();
-private static IFn CLOJURE_EDUCTION = null;
-
-private static IFn clojureEduction() {
-	if (CLOJURE_EDUCTION == null) {
-		synchronized (EDUCTION_LOCK) {
-			if (CLOJURE_EDUCTION == null) {
-				CLOJURE_EDUCTION = RT.CLOJURE_NS.findInternedVar(Symbol.intern("eduction"));
-			}
-		}
-	}
-	return CLOJURE_EDUCTION;
-}
-
 public synchronized ISeq stack(IFn xform) {
 	// A LazySeq is stackable when there's an xform which
 	// behaves the same whether it's composed iwth
@@ -104,7 +90,7 @@ public IReduceInit consumable() {
 		//        Also maybe punt on that?
 		// Recursively call consumable on coll if possible.
 		Object root = clojure.lang.RT.asConsumable(coll);
-		IReduceInit consumable = (IReduceInit)clojureEduction().invoke(xf, root);
+		IReduceInit consumable = new Eduction(xf, root);
 		xf = null;
 		coll = CONSUMED_SEQ;
 		if (isStrictlyConsumable()) {
