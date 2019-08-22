@@ -2,7 +2,7 @@ package clojure.lang;
 
 public class XFSeqDynamicBuffer2 extends AFn {
 
-    private static final int MIN_SIZE = 2;
+    private static final int MIN_SIZE = 8;
 
     private Object[] arr;
     private int idx;
