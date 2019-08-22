@@ -2,6 +2,10 @@ package clojure.lang;
 
 public class XFSeqDynamicBuffer2 extends AFn {
 
+    // Note: Changing this from 2, 4 and 8, sees huge difference
+    //       in performance (java8).
+    //       Setting it to 8 makes it faster on map inc and filter even
+    //       compared to vanilla lazy-seqs
     private static final int MIN_SIZE = 8;
 
     private Object[] arr;
