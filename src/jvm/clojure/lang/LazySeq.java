@@ -24,8 +24,8 @@ public LazySeq(IFn fn){
 	this.fn = fn;
 }
 
-public LazySeq(IFn xf, Object coll, Object ls, boolean stackable) {
-	this(new ConsumableInternals(xf, coll, ls, stackable));
+public LazySeq(IFn xf, Object coll, Object ls) {
+	this(new ConsumableInternals(xf, coll, ls));
 }
 
 private LazySeq(IPersistentMap meta, ISeq s){
@@ -271,15 +271,13 @@ private static class ConsumableInternals extends AFn implements Consumable {
 	}
 
 	private IFn xf;
-	protected Object coll;
+	private Object coll;
 	private Object ls;
-	private boolean stackable;
 
-	ConsumableInternals(IFn xf, Object coll, Object ls, boolean stackable) {
+	ConsumableInternals(IFn xf, Object coll, Object ls) {
 		this.xf = xf;
 		this.coll = coll;
 		this.ls = ls;
-		this.stackable = stackable;
 	}
 
 	void ensureNotConsumed(){
@@ -293,11 +291,26 @@ private static class ConsumableInternals extends AFn implements Consumable {
 		}
 	}
 
+	void setConsumed() {
+		xf = null;
+		coll = CONSUMED_SEQ;
+		if (isStrictlyConsumable()) {
+			ls = null;
+		}
+	}
+
 	public Object invoke() {
 		ensureNotConsumed();
-		xf = null;
-		coll = null;
-		return ls;
+		Object ret;
+		if (ls != null) {
+			ret = ls;
+		} else {
+			ret = XFSeq.create(xf, coll);
+		}
+		// After it's been invoked, the LazySeq will set this "fn" to null.
+		// No need to clear any fields..(?)
+		// setConsumed();
+		return ret;
 	}
 
 	@Override
@@ -305,24 +318,19 @@ private static class ConsumableInternals extends AFn implements Consumable {
 		ensureNotConsumed();
 		Object root = clojure.lang.RT.asConsumable(coll);
 		IReduceInit consumable = new Eduction(xf, root);
-		xf = null;
-		coll = CONSUMED_SEQ;
-		if (isStrictlyConsumable()) {
-			ls = null;
-		}
+		setConsumed();
 		return consumable;
 	}
 
 	@Override
 	public ISeq stack(IFn xform) {
+		// A seq is stackable when the caller doesn't pass in
+		// a custom LazySeq.
+		boolean stackable = ls == null;
 		if (stackable) {
 			ensureNotConsumed();
 			ISeq s = clojure.lang.RT.stackSeqs(xform, xf, coll);
-			xf = null;
-			coll = CONSUMED_SEQ;
-			if (isStrictlyConsumable()) {
-				ls = null;
-			}
+			setConsumed();
 			return s;
 		} else {
 			return null;
