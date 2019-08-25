@@ -33,7 +33,7 @@ public class XFSeqDynamicBuffer2 extends AFn {
     public XFSeqDynamicBuffer2 conj(Object o) {
         if (idx == arr.length) {
             // Grows quickly to 32, then slows down.
-            // 2 * 4 * 4
+            // 8 * 4 * 2 * 2 * 2
             Object[] larger = new Object[idx * (idx <= 8 ? 4 : 2)];
             System.arraycopy(arr, 0, larger, 0, idx);
             arr = larger;
@@ -44,32 +44,45 @@ public class XFSeqDynamicBuffer2 extends AFn {
     }
 
     public ISeq toSeq(ISeq more) {
+        ISeq s;
         switch(idx) {
             case 0:
-                return more;
+                s = more;
+                break;
+            // TODO: Verify whether handrolling these arities is a good idea.
             case 1:
+                s = new Cons(arr[0], more);
                 idx = 0;
-                return new Cons(arr[0], more);
+                arr[0] = null;
+                break;
             case 2:
-                // TODO: Verify whether handrolling these arities is a good idea.
+                s = new Cons(arr[0], new Cons(arr[1], more));
                 idx = 0;
-                return new Cons(arr[0], new Cons(arr[1], more));
+                arr[0] = null;
+                arr[1] = null;
+                break;
             case 3:
+                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more)));
                 idx = 0;
-                return new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more)));
+                arr[0] = null;
+                arr[1] = null;
+                arr[2] = null;
+                break;
+            case 4:
+                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], more))));
+                idx = 0;
+                arr[0] = null;
+                arr[1] = null;
+                arr[2] = null;
+                arr[3] = null;
+                break;
             default:
-                Object[] chunk = arr;
-                int end = idx;
-                // Set next array size to be the nearest power of 2 of the end offset.
-                // TODO: This was an optimization to skip calling .scope() for the
-                //       dechunked case. Is this even necessary any more?
-                //       Seems like quite unpredictable code.
-                int highBit = Integer.highestOneBit(end);
-                highBit = highBit == end ? end : highBit << 1;
-                arr = new Object[highBit < MIN_SIZE ? MIN_SIZE : highBit];
+                s = new ChunkedCons(new ArrayChunk(arr, 0, idx), more);
                 idx = 0;
-                return new ChunkedCons(new ArrayChunk(chunk, 0, end), more);
+                arr = null;
+                break;
         }
+        return s;
     }
 
     // Implements a reducing function (arities: 0, 1, 2)

@@ -100,7 +100,7 @@ public class XFSeq {
                     s = PersistentList.EMPTY;
                 }
             } else {
-                if (buf == xf.invoke(buf, s.first())) {
+                if (buf == xf.invoke(buf.scope(), s.first())) {
                     s = s.more();
                 } else {
                     s = PersistentList.EMPTY;
