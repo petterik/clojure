@@ -34,8 +34,7 @@ public class XFSeqDynamicBuffer2 extends AFn {
         if (idx == arr.length) {
             // Grows quickly to 32, then slows down.
             // 2 * 4 * 4
-            int growth = idx <= 8 ? idx * 4 : idx * 2;
-            Object[] larger = new Object[idx * growth];
+            Object[] larger = new Object[idx * (idx <= 8 ? 4 : 2)];
             System.arraycopy(arr, 0, larger, 0, idx);
             arr = larger;
         }
@@ -61,7 +60,13 @@ public class XFSeqDynamicBuffer2 extends AFn {
             default:
                 Object[] chunk = arr;
                 int end = idx;
-                arr = new Object[end < MIN_SIZE ? MIN_SIZE : chunk.length];
+                // Set next array size to be the nearest power of 2 of the end offset.
+                // TODO: This was an optimization to skip calling .scope() for the
+                //       dechunked case. Is this even necessary any more?
+                //       Seems like quite unpredictable code.
+                int highBit = Integer.highestOneBit(end);
+                highBit = highBit == end ? end : highBit << 1;
+                arr = new Object[highBit < MIN_SIZE ? MIN_SIZE : highBit];
                 idx = 0;
                 return new ChunkedCons(new ArrayChunk(chunk, 0, end), more);
         }
