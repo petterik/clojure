@@ -4277,16 +4277,21 @@
   {:added "1.0"
    :static true}
   ([n]
+   ;; TODO: Fixes bug where transducer returns every 7th
+   ;;       item for (take-nth 7/2) instead of every 4th
+   ;;       which the lazy-seq version did/does.
+   ;; TODO: This probably shouldn't go into this ticket though?
+   (let [n (long (Math/ceil n))]
      (fn [rf]
        (let [iv (volatile! -1)]
          (fn
            ([] (rf))
            ([result] (rf result))
            ([result input]
-              (let [i (vswap! iv inc)]
-                (if (zero? (rem i n))
-                  (rf result input)
-                  result)))))))
+            (let [^long i (vswap! iv inc)]
+              (if (zero? (rem i n))
+                (rf result input)
+                result))))))))
   ([n coll]
    ;; TODO Backcompat: Test non-pos integers repeat the first character forever.
    ;; (take 3 (take-nth 0 [1 2])) => (1 1 1)
