@@ -52,19 +52,20 @@ public class XFSeq {
 
         @Override
         public Object invoke() {
-            ISeq s = RT.seq(coll);
+            Object s = RT.seq(coll);
+            coll = null;
             if (s != null) {
                 XFSeqDynamicBuffer2 buf = new XFSeqDynamicBuffer2();
                 IFn xform = (IFn)xf.invoke(buf);
-                s = step(s, xform, buf, new NextStep(xform, buf));
+                NextStep ns = new NextStep(xform, buf, (ISeq)s);
+                s = ns.invoke();
             }
             xf = null;
-            coll = null;
             return s;
         };
     }
 
-    private static class NextStep extends AFn {
+    public static class NextStep extends AFn {
 
         private final IFn xf;
         private final XFSeqDynamicBuffer2 buf;
@@ -75,22 +76,36 @@ public class XFSeq {
             this.buf = buf;
         }
 
+        NextStep(IFn xf, XFSeqDynamicBuffer2 buf, ISeq s) {
+            this.xf = xf;
+            this.buf = buf;
+            this.s = s;
+        }
+
         public void setSeq(ISeq s) {
             this.s = s;
         }
 
         public Object invoke() {
-            ISeq c = s.seq();
-            s = null;
-            return step(c, xf, buf, this);
+            Object ret;
+            do {
+                ISeq c = s.seq();
+                s = null;
+                ret = step(c, xf, buf, this);
+            } while (ret == this);
+            return ret;
+        }
+
+        public LazySeq toLazySeq() {
+            return new LazySeq(this);
         }
     }
 
-    private static ISeq step(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf, NextStep ns) {
-        ISeq ret;
+    private static Object step(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf, NextStep ns) {
+        Object ret;
         if (s == null) {
             xf.invoke(buf.scope());
-            ret = buf.toSeq(null);
+            ret = buf.toSeq();
         } else {
             if (s instanceof IChunkedSeq) {
                 IChunk ch = ((IChunkedSeq) s).chunkedFirst();
@@ -107,7 +122,7 @@ public class XFSeq {
                 }
             }
             ns.setSeq(s);
-            ret = buf.toSeq(new LazySeq(ns));
+            ret = buf.toSeq(ns);
         }
         return ret;
     }

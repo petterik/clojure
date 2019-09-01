@@ -43,33 +43,44 @@ public class XFSeqDynamicBuffer2 extends AFn {
         return this;
     }
 
-    public ISeq toSeq(ISeq more) {
-        ISeq s;
+    public ISeq toSeq() {
+        ISeq ret;
+        if (idx == 0) {
+            ret = null;
+        } else {
+            ret = new ChunkedCons(new ArrayChunk(arr, 0, idx), null);
+        }
+        arr = null;
+        return ret;
+    }
+
+    public Object toSeq(XFSeq.NextStep more) {
+        Object s;
         switch(idx) {
             case 0:
                 s = more;
                 break;
             // TODO: Verify whether handrolling these arities is a good idea.
             case 1:
-                s = new Cons(arr[0], more);
+                s = new Cons(arr[0], more.toLazySeq());
                 idx = 0;
                 arr[0] = null;
                 break;
             case 2:
-                s = new Cons(arr[0], new Cons(arr[1], more));
+                s = new Cons(arr[0], new Cons(arr[1], more.toLazySeq()));
                 idx = 0;
                 arr[0] = null;
                 arr[1] = null;
                 break;
             case 3:
-                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more)));
+                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more.toLazySeq())));
                 idx = 0;
                 arr[0] = null;
                 arr[1] = null;
                 arr[2] = null;
                 break;
             case 4:
-                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], more))));
+                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], more.toLazySeq()))));
                 idx = 0;
                 arr[0] = null;
                 arr[1] = null;
@@ -77,7 +88,7 @@ public class XFSeqDynamicBuffer2 extends AFn {
                 arr[3] = null;
                 break;
             default:
-                s = new ChunkedCons(new ArrayChunk(arr, 0, idx), more);
+                s = new ChunkedCons(new ArrayChunk(arr, 0, idx), more.toLazySeq());
                 idx = 0;
                 arr = null;
                 break;
