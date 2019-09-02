@@ -259,6 +259,7 @@ synchronized public boolean isRealized(){
 
 private static class ConsumableInternals extends AFn implements Consumable {
 
+    private static final Keyword STACKABLE = Keyword.intern(null, "stackable");
 	private static final Keyword CONSUMED_SEQ = Keyword.intern("clojure.lang.LazySeq$ConsumableInternals", "CONSUMED_SEQ");
 	private static final Var STRICT_CONSUMABLE_SEQS = RT.var("clojure.lang.LazySeq","*strict-consumable-seqs*").setDynamic();
 
@@ -326,7 +327,7 @@ private static class ConsumableInternals extends AFn implements Consumable {
 	public ISeq stack(IFn xform) {
 		// A seq is stackable when the caller doesn't pass in
 		// a custom LazySeq.
-		boolean stackable = ls == null;
+		boolean stackable = ls == null || ((IMeta) ls).meta().entryAt(STACKABLE).val().equals(true);
 		if (stackable) {
 			ensureNotConsumed();
 			ISeq s = clojure.lang.RT.stackSeqs(xform, xf, coll);

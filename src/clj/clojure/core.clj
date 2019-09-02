@@ -2920,7 +2920,20 @@
                   result
                   (rf result input))))))))
   ([n coll]
-     (lazy-seq-2 (drop n) coll)))
+   (let [step (fn [n coll]
+                (let [s (seq coll)]
+                  (if (and (pos? n) s)
+                    (recur (dec n) (rest s))
+                    s)))]
+     ;; TODO: Drop is not efficient as a standalone
+     ;;       XFSeq when n is not close to (count coll)
+     ;;       and (seq coll) is chunked.
+     ;;       It would be efficient for stacked seqs so
+     ;;       we should add way to make this seq stackable.
+     ;;       Using metadata for now, but it's kind of gross?
+     (lazy-seq-2 (drop n) coll
+       ^:stackable
+       (lazy-seq (step n coll))))))
 
 (defn drop-last
   "Return a lazy sequence of all but the last n (default 1) items in coll"
