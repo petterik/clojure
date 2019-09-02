@@ -7673,12 +7673,20 @@ fails, attempts to require sym's namespace and retries."
 
 (defn consumable!
   "Takes a collection and returns a consumable version of the
-  collections. Usage of the returned  consumable may make the
-  original collection unusable as a sequence or in another
-  consumable context."
+  collection. Usage of the returned consumable may render the
+  original collection unusable."
   {:added "RELEASE"}
   [coll]
-  (clojure.lang.RT/asConsumable coll))
+  (reify
+    clojure.lang.Seqable
+    (seq [_]
+      (seq (clojure.lang.RT/asStackedSeq coll)))
+
+    clojure.lang.IReduceInit
+    (reduce [_ f init]
+      (reduce f init (clojure.lang.RT/asConsumable coll)))
+
+    clojure.lang.Sequential))
 
 (defn run!
   "Runs the supplied procedure (via reduce), for purposes of side
