@@ -2908,19 +2908,21 @@
   {:added "1.0"
    :static true}
   ([n]
+   (let [n (clojure.lang.RT/longCast (java.lang.Math/ceil n))
+         dec-to-zero #(if (zero? %) % (dec %))]
      (fn [rf]
-       (let [nv (volatile! n)]
-         (fn
-           ([] (rf))
-           ([result] (rf result))
-           ([result input]
-              (let [n @nv]
-                (vswap! nv dec)
-                (if (pos? n)
-                  result
-                  (rf result input))))))))
+      (let [nv (volatile! n)]
+        (fn
+          ([] (rf))
+          ([result] (rf result))
+          ([result input]
+           (let [n @nv]
+             (vswap! nv dec-to-zero)
+             (if (pos? n)
+               result
+               (rf result input)))))))))
   ([n coll]
-     (lazy-seq-2 (drop n) coll)))
+   (lazy-seq-2 (drop n) coll)))
 
 (defn drop-last
   "Return a lazy sequence of all but the last n (default 1) items in coll"
