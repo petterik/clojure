@@ -327,7 +327,14 @@ private static class ConsumableInternals extends AFn implements Consumable {
 	public ISeq stack(IFn xform) {
 		// A seq is stackable when the caller doesn't pass in
 		// a custom LazySeq.
-		boolean stackable = ls == null || ((IMeta) ls).meta().entryAt(STACKABLE).val().equals(true);
+		boolean stackable;
+		if (ls == null) {
+		    stackable = true;
+		} else {
+		    IPersistentMap meta = ((IMeta) ls).meta();
+		    stackable = meta != null && meta.containsKey(STACKABLE) && Boolean.TRUE.equals(meta.entryAt(STACKABLE).val());
+		}
+
 		if (stackable) {
 			ensureNotConsumed();
 			ISeq s = clojure.lang.RT.stackSeqs(xform, xf, coll);
