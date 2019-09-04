@@ -88,7 +88,17 @@ public class XFSeqDynamicBuffer2 extends AFn {
                 arr[3] = null;
                 break;
             default:
-                s = new ChunkedCons(new ArrayChunk(arr, 0, idx), more.toLazySeq());
+                // Returns 32 sized chunks in case the transduction created
+                // more items than that. When chained, it can blow up.
+                // This problem was found with code that repeated interpose:
+                // (interpose nil (interpose nil ... (interpose nil (range)) ... ))
+                s = more.toLazySeq();
+                int offset = idx;
+                do {
+                    int end = offset;
+                    offset = Math.max(0, offset - 32);
+                    s = new ChunkedCons(new ArrayChunk(arr, offset, end), (ISeq)s);
+                } while (offset > 0);
                 idx = 0;
                 arr = null;
                 break;
