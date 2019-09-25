@@ -44,8 +44,8 @@ public synchronized ISeq stack(IFn xform) {
 	return fn instanceof Consumable ? ((Consumable)fn).stack(xform) : null;
 }
 
-public synchronized IReduceInit consumable() {
-	return fn instanceof Consumable ? ((Consumable)fn).consumable() : null;
+public synchronized IReduceInit consumable(IFn xform) {
+	return fn instanceof Consumable ? ((Consumable)fn).consumable(xform) : null;
 }
 
 final synchronized Object sval(){
@@ -315,10 +315,9 @@ private static class ConsumableInternals extends AFn implements Consumable {
 	}
 
 	@Override
-	public IReduceInit consumable() {
+	public IReduceInit consumable(IFn xform) {
 		ensureNotConsumed();
-		Object root = clojure.lang.RT.asConsumable(coll);
-		IReduceInit consumable = new Eduction(xf, root);
+		IReduceInit consumable = clojure.lang.RT.stackConsunables(xform, xf, coll);
 		setConsumed();
 		return consumable;
 	}

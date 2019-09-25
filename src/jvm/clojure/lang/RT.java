@@ -1852,7 +1852,7 @@ static public boolean isReduced(Object r){
 static public Object asConsumable(Object o) {
 	Object c;
 	if (o instanceof clojure.lang.Consumable
-			&& (c = ((clojure.lang.Consumable) o).consumable()) != null)
+			&& (c = ((clojure.lang.Consumable) o).consumable(null)) != null)
 		return c;
 	return o;
 }
@@ -1863,6 +1863,29 @@ static public Object asStackedSeq(Object o) {
 			&& (s = ((clojure.lang.Consumable) o).stack(null)) != null)
 		return s;
 	return o;
+}
+
+static IReduceInit stackConsunables(IFn xform1, IFn xform2, Object coll) {
+	IFn xform;
+	if (xform1 == null) {
+		xform = xform2;
+	} else {
+		xform = new AFn() {
+			@Override
+			public Object invoke(Object rf) {
+				// TODO, reverse order of xform invokation?
+				return xform2.invoke(xform1.invoke(rf));
+			}
+		};
+	}
+	IReduceInit r;
+	if (coll instanceof clojure.lang.Consumable
+			&& (r = ((clojure.lang.Consumable)coll).consumable(xform)) != null) {
+		return r;
+	} else {
+		r = new Eduction(xform, coll);
+	}
+	return r;
 }
 
 // Called by seqs when stacking them. Produces a stackable sequence.
