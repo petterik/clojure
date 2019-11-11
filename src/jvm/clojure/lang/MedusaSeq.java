@@ -9,15 +9,6 @@ interface SubscribableSeq {
     ISeq sub(IFn rf);
 }
 
-interface SeqRedirect {
-    /**
-     * Seq puts its items on rf instead of whatever it was doing.
-     * Returns the head of the collection, which first/next is called
-     * puts things onto rf.
-     */
-    ISeq internalRedirect(IFn rf);
-}
-
 /**
  * Seq which one can subscribe to. Subscribers can redirect the internal seq
  * when it is the only usage of the seq, to allow for faster flow through the collection.
@@ -26,6 +17,17 @@ interface SeqRedirect {
  * This empowers the user to avoid any overhead of keeping track of the redirection logic.
  */
 public class MedusaSeq implements Seqable, SubscribableSeq {
+
+    // TODO: Implement ISeq, to have (seq? (map inc ..)) => true (avoid breaking change).
+
+    public interface SeqRedirect {
+        /**
+         * Seq puts its items on rf instead of whatever it was doing.
+         * Returns the head of the collection, which first/next is called
+         * puts things onto rf.
+         */
+        ISeq internalRedirect(IFn rf);
+    }
 
     /**
      * Map from SeqHead -> ?
@@ -61,23 +63,20 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
                     }
                 }
 
-                ISeq more;
                 ISeq ls;
                 if (s instanceof IChunkedSeq) {
                     IChunkedSeq cs = (IChunkedSeq) s;
-                    IChunk chunk = cs.chunkedFirst();
-                    more = wrappedSeq(refs, this, cs.chunkedMore(), rf);
-                    ls = new ChunkedCons(chunk, more);
+                    ls = new ChunkedCons(cs.chunkedFirst(), wrappedSeq(refs, this, cs.chunkedMore(), rf));
                 } else {
-                    Object f = s.first();
-                    more = wrappedSeq(refs, this, s.more(), rf);
-                    ls = new Cons(f, more);
+                    ls = new Cons(s.first(), wrappedSeq(refs, this, s.more(), rf));
                 }
-
                 return ls;
             }
         };
 
+        // Removes the previous ref and adds the fn on there.
+        // When the fn is invoked, it'll call this method again
+        // and remove itself, while adding on a new fn.
         synchronized (refs) {
             refs.remove(ref);
             refs.put(fn, true);
@@ -113,6 +112,7 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
 
     @Override
     public synchronized ISeq sub(IFn rf) {
+        // TODO: Only allow for one subscription? Then use the returned seq from seq()?
         // TODO: Check if seqable is non-nil? (Actually, check if it's takeoverable?)
         if (ret == null) {
             ensureRefsMap();
