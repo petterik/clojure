@@ -14,7 +14,7 @@ package clojure.lang;
 
 import java.util.*;
 
-public final class LazySeq extends Obj implements Consumable, ISeq, Sequential, List, IPending, IHashEq{
+public final class LazySeq extends Obj implements Consumable, ISeq, Sequential, List, IPending, IHashEq, ISeqRedirect {
 
 private IFn fn;
 private Object sv;
@@ -46,6 +46,10 @@ public synchronized ISeq stack(IFn xform) {
 
 public synchronized IReduceInit consumable(IFn xform) {
 	return fn instanceof Consumable ? ((Consumable)fn).consumable(xform) : null;
+}
+
+public synchronized SeqRedirect internalRedirect (IFn rf) {
+    return fn instanceof ISeqRedirect ? ((ISeqRedirect)fn).internalRedirect(rf) : null;
 }
 
 final synchronized Object sval(){
@@ -257,7 +261,7 @@ synchronized public boolean isRealized(){
 	return fn == null;
 }
 
-private static class ConsumableInternals extends AFn implements Consumable {
+private static class ConsumableInternals extends AFn implements Consumable, ISeqRedirect{
 
     private static final Keyword STACKABLE = Keyword.intern(null, "stackable");
 	private static final Keyword CONSUMED_SEQ = Keyword.intern("clojure.lang.LazySeq$ConsumableInternals", "CONSUMED_SEQ");
@@ -343,5 +347,21 @@ private static class ConsumableInternals extends AFn implements Consumable {
 			return null;
 		}
 	}
+
+    @Override
+    public SeqRedirect internalRedirect(IFn rf) {
+        Object obj = invoke();
+        if (obj instanceof ISeqRedirect) {
+            return ((ISeqRedirect) obj).internalRedirect(rf);
+        } else {
+            // TODO: Problematic that internal redirect does not return an ISeq.
+            // TODO: If it did, ... things would accidentally compose more, but would
+            // TODO: everything actually be correct?
+            // TODO: Need to think about how LazySeq's and stuff fit together.
+            // TODO: Since internalRedirect is only called when there's one user of
+            // TODO: the seq, some things (like mutation) should be ok.
+            return null;
+        }
+    }
 }
 }

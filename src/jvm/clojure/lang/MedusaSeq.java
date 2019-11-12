@@ -20,15 +20,6 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
 
     // TODO: Implement ISeq, to have (seq? (map inc ..)) => true (avoid breaking change).
 
-    public interface SeqRedirect {
-        /**
-         * Seq puts its items on rf instead of whatever it was doing.
-         * Returns the head of the collection, which first/next is called
-         * puts things onto rf.
-         */
-        ISeq internalRedirect(IFn rf);
-    }
-
     /**
      * Map from SeqHead -> ?
      */
@@ -55,8 +46,13 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
                 synchronized (refs) {
                     // Call to .size will expunge all refs which have GC'ed.
                     if (refs.size() < 2) {
-                        if (rf != null && s instanceof SeqRedirect) {
-                            return ((SeqRedirect) s).internalRedirect(rf);
+                        SeqRedirect redirect;
+                        if (rf != null
+                                && s instanceof ISeqRedirect
+                                && (redirect = ((ISeqRedirect) s).internalRedirect(rf)) != null) {
+                            // TODO: redirect does not implement seqable, ISeq, or anything like that.
+                            // TODO: making it problematic for LazySeq to handle right now.
+                            return redirect;
                         } else {
                             return s;
                         }
@@ -110,6 +106,8 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
         return ret;
     }
 
+    // TODO: Add (Object acc) to this sub call?
+    // TODO: That way, SubRedirect can drive the redirection, via either reduce or some XFSeq-like thing.
     @Override
     public synchronized ISeq sub(IFn rf) {
         // TODO: Only allow for one subscription? Then use the returned seq from seq()?
@@ -120,6 +118,6 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
         } else {
             return ret;
         }
-        // TODO: Somehow implement SeqRedirect on LazySeq?
+        // TODO: Somehow implement ISeqRedirect on LazySeq?
     }
 }

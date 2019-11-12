@@ -41,7 +41,7 @@ package clojure.lang;
  */
 public class XFSeq {
 
-    private static class InitLazySeq extends AFn {
+    private static class InitLazySeq extends AFn implements ISeqRedirect{
         private IFn xf;
         private Object coll;
 
@@ -62,13 +62,21 @@ public class XFSeq {
             }
             xf = null;
             return s;
-        };
+        }
+
+        @Override
+        public SeqRedirect internalRedirect(IFn rf) {
+            SeqRedirect sr = new SeqRedirect(rf, (IFn)xf.invoke(rf), RT.seq(coll));
+            coll = null;
+            xf = null;
+            return sr;
+        }
     }
 
-    public static class NextStep extends AFn {
+    public static class NextStep extends AFn implements ISeqRedirect{
 
-        private final IFn xf;
-        private final XFSeqDynamicBuffer2 buf;
+        private IFn xf;
+        private XFSeqDynamicBuffer2 buf;
         private ISeq s;
 
         NextStep(IFn xf, XFSeqDynamicBuffer2 buf) {
@@ -96,8 +104,20 @@ public class XFSeq {
             return ret;
         }
 
-        public LazySeq toLazySeq() {
+        LazySeq toLazySeq() {
             return new LazySeq(this);
+        }
+
+        @Override
+        public SeqRedirect internalRedirect(IFn rf) {
+            // The buf redirect, links xf with rf.
+            // I.e. calling xf will call rf (which is an initialized xf2).
+            buf.setRedirect(rf);
+            SeqRedirect ret = new SeqRedirect(rf, xf, s);
+            xf = null;
+            buf = null;
+            s = null;
+            return ret;
         }
     }
 

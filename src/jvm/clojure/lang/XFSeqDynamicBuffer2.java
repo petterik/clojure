@@ -10,6 +10,7 @@ public class XFSeqDynamicBuffer2 extends AFn {
 
     private Object[] arr;
     private int idx;
+    private IFn redirect;
 
     public XFSeqDynamicBuffer2(){
         idx = 0;
@@ -108,15 +109,19 @@ public class XFSeqDynamicBuffer2 extends AFn {
 
     // Implements a reducing function (arities: 0, 1, 2)
     public Object invoke() {
-        return new XFSeqDynamicBuffer2();
+        return redirect == null ? new XFSeqDynamicBuffer2() : redirect.invoke();
     }
 
     public Object invoke(Object a) {
-        return a;
+        return redirect == null ? a : redirect.invoke(a);
     }
 
     public Object invoke(Object a, Object b) {
         // assert(a == this);
-        return this.conj(b);
+        return redirect == null ? this.conj(b) : redirect.invoke(a, b);
+    }
+
+    void setRedirect(IFn rf) {
+        this.redirect = rf;
     }
 }
