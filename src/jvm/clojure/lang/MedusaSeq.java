@@ -2,13 +2,6 @@ package clojure.lang;
 
 import java.util.WeakHashMap;
 
-interface SubscribableSeq {
-    /**
-     *  A seq which can be "listened" and potentially "taken over".
-     */
-    ISeq sub(IFn rf);
-}
-
 /**
  * Seq which one can subscribe to. Subscribers can redirect the internal seq
  * when it is the only usage of the seq, to allow for faster flow through the collection.
@@ -16,7 +9,7 @@ interface SubscribableSeq {
  * Subscriptions can only occur before the first call to .seq of the instance of this class.
  * This empowers the user to avoid any overhead of keeping track of the redirection logic.
  */
-public class MedusaSeq implements Seqable, SubscribableSeq {
+public class MedusaSeq implements Seqable, IRedirectableSeq {
 
     // TODO: Implement ISeq, to have (seq? (map inc ..)) => true (avoid breaking change).
 
@@ -42,23 +35,23 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
         IFn fn = new AFn() {
             @Override
             public Object invoke() {
-                ISeq s = s2.seq();
                 synchronized (refs) {
                     // Call to .size will expunge all refs which have GC'ed.
                     if (refs.size() < 2) {
                         SeqRedirect redirect;
                         if (rf != null
-                                && s instanceof ISeqRedirect
-                                && (redirect = ((ISeqRedirect) s).internalRedirect(rf)) != null) {
+                                && s2 instanceof ISeqRedirect
+                                && (redirect = ((ISeqRedirect) s2).internalRedirect(rf)) != null) {
                             // TODO: redirect does not implement seqable, ISeq, or anything like that.
                             // TODO: making it problematic for LazySeq to handle right now.
                             return redirect;
                         } else {
-                            return s;
+                            return s2.seq();
                         }
                     }
                 }
 
+                ISeq s = s2.seq();
                 ISeq ls;
                 if (s instanceof IChunkedSeq) {
                     IChunkedSeq cs = (IChunkedSeq) s;
@@ -114,7 +107,7 @@ public class MedusaSeq implements Seqable, SubscribableSeq {
         // TODO: Check if seqable is non-nil? (Actually, check if it's takeoverable?)
         if (ret == null) {
             ensureRefsMap();
-            return wrappedSeq(refs, null, internalSeq(), rf);
+            return wrappedSeq(refs, null, internalSeq(), rf).seq();
         } else {
             return ret;
         }

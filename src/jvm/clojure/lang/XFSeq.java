@@ -52,37 +52,74 @@ public class XFSeq {
 
         @Override
         public Object invoke() {
-            Object s = RT.seq(coll);
-            coll = null;
-            if (s != null) {
+            if (coll instanceof IRedirectableSeq) {
                 XFSeqDynamicBuffer2 buf = new XFSeqDynamicBuffer2();
-                IFn xform = (IFn)xf.invoke(buf);
-                NextStep ns = new NextStep(xform, buf, (ISeq)s);
-                s = ns.invoke();
+                IFn xform = (IFn) xf.invoke(buf);
+                xf = null;
+                ISeq s = ((IRedirectableSeq) coll).sub(xform);
+                coll = null;
+                if (s instanceof SeqRedirect) {
+                    // Replaces the xform with the redirected one, as it'll call
+                    // the passed xform.
+                    // See: NextStep.internalRedirect()
+                    SeqRedirect redirect = (SeqRedirect) s;
+                    xform = redirect.getRedirectedXForm();
+                    s = redirect.getColl();
+                }
+                return new NextStepRedirectable(xform, buf, s).invoke();
+            } else {
+                Object s = RT.seq(coll);
+                coll = null;
+                if (s != null) {
+                    XFSeqDynamicBuffer2 buf = new XFSeqDynamicBuffer2();
+                    IFn xform = (IFn) xf.invoke(buf);
+                    NextStep ns = new NextStep(xform, buf, (ISeq) s);
+                    s = ns.invoke();
+                }
+                xf = null;
+                return s;
             }
-            xf = null;
-            return s;
         }
 
         @Override
         public SeqRedirect internalRedirect(IFn rf) {
-            SeqRedirect sr = new SeqRedirect(rf, (IFn)xf.invoke(rf), RT.seq(coll));
+            SeqRedirect sr = new SeqRedirect((IFn)xf.invoke(rf), RT.seq(coll));
             coll = null;
             xf = null;
             return sr;
         }
     }
 
+    public static class NextStepRedirectable extends NextStep {
+
+        NextStepRedirectable(IFn xf, XFSeqDynamicBuffer2 buf, ISeq s) {
+            super(xf, buf, s);
+        }
+
+        public Object invoke() {
+            Object ret;
+            do {
+                ISeq coll = s.seq();
+                s = null;
+                if (coll instanceof SeqRedirect) {
+                    SeqRedirect redirect = (SeqRedirect) coll;
+                    NextStep ns = new NextStep(redirect.getRedirectedXForm(), buf, redirect.getColl());
+                    xf = null;
+                    buf = null;
+                    return ns.invoke();
+                } else {
+                    ret = step(coll, xf, buf, this);
+                }
+            } while (ret == this);
+            return ret;
+        }
+    }
+
     public static class NextStep extends AFn implements ISeqRedirect{
 
-        private IFn xf;
-        private XFSeqDynamicBuffer2 buf;
-        private ISeq s;
-
-        NextStep(IFn xf, XFSeqDynamicBuffer2 buf) {
-            this.xf = xf;
-            this.buf = buf;
-        }
+        protected IFn xf;
+        protected XFSeqDynamicBuffer2 buf;
+        protected ISeq s;
 
         NextStep(IFn xf, XFSeqDynamicBuffer2 buf, ISeq s) {
             this.xf = xf;
@@ -113,7 +150,7 @@ public class XFSeq {
             // The buf redirect, links xf with rf.
             // I.e. calling xf will call rf (which is an initialized xf2).
             buf.setRedirect(rf);
-            SeqRedirect ret = new SeqRedirect(rf, xf, s);
+            SeqRedirect ret = new SeqRedirect(xf, s);
             xf = null;
             buf = null;
             s = null;
