@@ -88,6 +88,16 @@
     ([coll f] (.reduce ^clojure.lang.IReduce coll f))
     ([coll f val] (.reduce coll f val)))
 
+  clojure.lang.MedusaSeq
+  (coll-reduce
+    ([coll f] (seq-reduce coll f))
+    ([coll f val]
+     #_(let [coll (.sub coll f)]
+       ;; TODO: WARNING: JUST TRYING THIS OUT.
+       (System/gc)
+       )
+     (seq-reduce coll f val)))
+
   ;;aseqs are iterable, masking internal-reducers
   clojure.lang.ASeq
   (coll-reduce

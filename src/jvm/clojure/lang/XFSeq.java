@@ -56,8 +56,10 @@ public class XFSeq {
                 XFSeqDynamicBuffer2 buf = new XFSeqDynamicBuffer2();
                 IFn xform = (IFn) xf.invoke(buf);
                 xf = null;
-                ISeq s = ((IRedirectableSeq) coll).sub(xform);
+                Seqable s = ((IRedirectableSeq) coll).sub(xform);
                 coll = null;
+                // TODO: WARNING: JUST TRYING THIS OUT. CALLING System.gc() after subbing.
+                System.gc();
                 if (s instanceof SeqRedirect) {
                     // Replaces the xform with the redirected one, as it'll call
                     // the passed xform.
@@ -66,7 +68,7 @@ public class XFSeq {
                     xform = redirect.getRedirectedXForm();
                     s = redirect.getColl();
                 }
-                return new NextStepRedirectable(xform, buf, s).invoke();
+                return new NextStepRedirectable(xform, buf, s.seq()).invoke();
             } else {
                 Object s = RT.seq(coll);
                 coll = null;

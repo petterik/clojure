@@ -35,31 +35,47 @@ public class MedusaSeq implements Seqable, IRedirectableSeq {
         IFn fn = new AFn() {
             @Override
             public Object invoke() {
+                int refCount;
                 synchronized (refs) {
                     // Call to .size will expunge all refs which have GC'ed.
-                    if (refs.size() < 2) {
+                    refCount = refs.size();
+                }
+                System.err.println("Ref count: " + refCount);
+
+                ISeq ret;
+                switch(refCount) {
+                    case 0:
+                        throw new IllegalStateException("Ref count should never be 0 when creating a new element.");
+                    case 1:
                         SeqRedirect redirect;
                         if (rf != null
                                 && s2 instanceof ISeqRedirect
                                 && (redirect = ((ISeqRedirect) s2).internalRedirect(rf)) != null) {
                             // TODO: redirect does not implement seqable, ISeq, or anything like that.
                             // TODO: making it problematic for LazySeq to handle right now.
-                            return redirect;
+                            ret = redirect;
                         } else {
-                            return s2.seq();
+                            ret = s2.seq();
                         }
-                    }
+                        break;
+                    case 2:
+                        ISeq s = s2.seq();
+                        if (s == null) {
+                            ret = null;
+                        } else {
+                            if (s instanceof IChunkedSeq) {
+                                IChunkedSeq cs = (IChunkedSeq) s;
+                                ret = new ChunkedCons(cs.chunkedFirst(), wrappedSeq(refs, this, cs.chunkedMore(), rf));
+                            } else {
+                                ret = new Cons(s.first(), wrappedSeq(refs, this, s.more(), rf));
+                            }
+                        }
+                        break;
+                    default:
+                        ret = s2.seq();
+                        break;
                 }
-
-                ISeq s = s2.seq();
-                ISeq ls;
-                if (s instanceof IChunkedSeq) {
-                    IChunkedSeq cs = (IChunkedSeq) s;
-                    ls = new ChunkedCons(cs.chunkedFirst(), wrappedSeq(refs, this, cs.chunkedMore(), rf));
-                } else {
-                    ls = new Cons(s.first(), wrappedSeq(refs, this, s.more(), rf));
-                }
-                return ls;
+                return ret;
             }
         };
 
@@ -102,15 +118,21 @@ public class MedusaSeq implements Seqable, IRedirectableSeq {
     // TODO: Add (Object acc) to this sub call?
     // TODO: That way, SubRedirect can drive the redirection, via either reduce or some XFSeq-like thing.
     @Override
-    public synchronized ISeq sub(IFn rf) {
+    public synchronized Seqable sub(IFn rf) {
         // TODO: Only allow for one subscription? Then use the returned seq from seq()?
         // TODO: Check if seqable is non-nil? (Actually, check if it's takeoverable?)
         if (ret == null) {
             ensureRefsMap();
-            return wrappedSeq(refs, null, internalSeq(), rf).seq();
+            return wrappedSeq(refs, null, internalSeq(), rf);
         } else {
             return ret;
         }
         // TODO: Somehow implement ISeqRedirect on LazySeq?
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        System.err.println("MedusaSeq gc'ed");
+        super.finalize();
     }
 }

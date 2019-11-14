@@ -54,6 +54,6 @@ public class SeqRedirect implements ISeq{
 
     @Override
     public ISeq seq() {
-        throw new UnsupportedOperationException();
+        return this;
     }
 }

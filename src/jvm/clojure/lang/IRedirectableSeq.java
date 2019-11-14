@@ -5,6 +5,6 @@ public interface IRedirectableSeq {
     /**
      *  A seq which can be "listened" and potentially "taken over".
      */
-    ISeq sub(IFn rf);
+    Seqable sub(IFn rf);
 
 }
