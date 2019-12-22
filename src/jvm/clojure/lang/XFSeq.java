@@ -86,33 +86,24 @@ public class XFSeq {
         }
 
         public Object invoke() {
-            Object ret;
-            do {
-                ISeq c = s.seq();
-                if (c == null) {
-                    buf.scope();
-                    xf.invoke(buf);
-                    ret = buf.toSeq();
+            ISeq c = s.seq();
+            if (c == null) {
+                buf.scope();
+                xf.invoke(buf);
+                return buf.toSeq();
+            } else {
+                if (c instanceof IChunkedSeq) {
+                    c = invokeChunked((IChunkedSeq) c);
                 } else {
-                    if (c instanceof IChunkedSeq) {
-                        c = invokeChunked((IChunkedSeq) c);
+                    if (buf == xf.invoke(buf, c.first())) {
+                        c = c.more();
                     } else {
-                        buf.scope();
-                        if (buf == xf.invoke(buf, c.first())) {
-                            c = c.more();
-                        } else {
-                            c = PersistentList.EMPTY;
-                        }
+                        c = PersistentList.EMPTY;
                     }
-                    s = c;
-                    ret = buf.toSeq(this);
                 }
-            } while (ret == this);
-            return ret;
-        }
-
-        public LazySeq toLazySeq() {
-            return new LazySeq(this);
+                s = c;
+                return buf.toSeq(new LazySeq(this));
+            }
         }
     }
 

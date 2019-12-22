@@ -29,17 +29,15 @@ public final class XFSeqDynamicBuffer2 extends AFn {
     }
 
     public ISeq toSeq() {
-        ISeq ret;
         if (idx == 0) {
-            ret = null;
+            return null;
         } else {
-            ret = new ChunkedCons(new ArrayChunk(arr, 0, idx), null);
+            // Doesn't need to set arr to nil as this is the final step in XFSeq.NextStep
+            return new ChunkedCons(new ArrayChunk(arr, 0, idx), null);
         }
-        arr = null;
-        return ret;
     }
 
-    public Object toSeq(XFSeq.NextStep more) {
+    public Object toSeq(ISeq more) {
         Object s;
         switch(idx) {
             case 0:
@@ -47,25 +45,25 @@ public final class XFSeqDynamicBuffer2 extends AFn {
                 break;
             // TODO: Verify whether handrolling these arities is a good idea.
             case 1:
-                s = new Cons(arr[0], more.toLazySeq());
+                s = new Cons(arr[0], more);
                 idx = 0;
                 arr[0] = null;
                 break;
             case 2:
-                s = new Cons(arr[0], new Cons(arr[1], more.toLazySeq()));
+                s = new Cons(arr[0], new Cons(arr[1], more));
                 idx = 0;
                 arr[0] = null;
                 arr[1] = null;
                 break;
             case 3:
-                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more.toLazySeq())));
+                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more)));
                 idx = 0;
                 arr[0] = null;
                 arr[1] = null;
                 arr[2] = null;
                 break;
             case 4:
-                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], more.toLazySeq()))));
+                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], more))));
                 idx = 0;
                 arr[0] = null;
                 arr[1] = null;
@@ -100,24 +98,24 @@ public final class XFSeqDynamicBuffer2 extends AFn {
             case 30:
             case 31:
             case 32:
-                s = new ChunkedCons(new ArrayChunk(arr, 0, idx), more.toLazySeq());
+                s = new ChunkedCons(new ArrayChunk(arr, 0, idx), more);
+                scope(idx);
                 idx = 0;
-                arr = null;
                 break;
             default:
                 // Returns 32 sized chunks in case the transduction created
                 // more items than that. When chained, it can blow up.
                 // This problem was found with code that repeated interpose:
                 // (interpose nil (interpose nil ... (interpose nil (range)) ... ))
-                s = more.toLazySeq();
+                s = more;
                 int offset = idx;
                 do {
                     int end = offset;
                     offset = Math.max(0, offset - 32);
                     s = new ChunkedCons(new ArrayChunk(arr, offset, end), (ISeq)s);
                 } while (offset > 0);
+                scope(32);
                 idx = 0;
-                arr = null;
                 break;
         }
         return s;
