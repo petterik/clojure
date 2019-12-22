@@ -42,8 +42,8 @@ package clojure.lang;
 public class XFSeq {
 
     private static class InitLazySeq extends AFn {
-        private IFn xf;
-        private Object coll;
+        private final IFn xf;
+        private final Object coll;
 
         InitLazySeq(IFn xf, Object coll) {
             this.xf = xf;
@@ -53,16 +53,14 @@ public class XFSeq {
         @Override
         public Object invoke() {
             Object s = RT.seq(coll);
-            coll = null;
             if (s != null) {
                 XFSeqDynamicBuffer2 buf = new XFSeqDynamicBuffer2();
                 IFn xform = (IFn)xf.invoke(buf);
                 NextStep ns = new NextStep(xform, buf, (ISeq)s);
                 s = ns.invoke();
             }
-            xf = null;
             return s;
-        };
+        }
     }
 
     public static class NextStep extends AFn {
@@ -71,27 +69,44 @@ public class XFSeq {
         private final XFSeqDynamicBuffer2 buf;
         private ISeq s;
 
-        NextStep(IFn xf, XFSeqDynamicBuffer2 buf) {
-            this.xf = xf;
-            this.buf = buf;
-        }
-
         NextStep(IFn xf, XFSeqDynamicBuffer2 buf, ISeq s) {
             this.xf = xf;
             this.buf = buf;
             this.s = s;
         }
 
-        public void setSeq(ISeq s) {
-            this.s = s;
+        private ISeq invokeChunked(IChunkedSeq cs) {
+            IChunk ch = cs.chunkedFirst();
+            buf.scope(ch.count());
+            if (buf == ch.reduce(xf, buf)) {
+                return cs.chunkedMore();
+            } else {
+                return PersistentList.EMPTY;
+            }
         }
 
         public Object invoke() {
             Object ret;
             do {
                 ISeq c = s.seq();
-                s = null;
-                ret = step(c, xf, buf, this);
+                if (c == null) {
+                    buf.scope();
+                    xf.invoke(buf);
+                    ret = buf.toSeq();
+                } else {
+                    if (c instanceof IChunkedSeq) {
+                        c = invokeChunked((IChunkedSeq) c);
+                    } else {
+                        buf.scope();
+                        if (buf == xf.invoke(buf, c.first())) {
+                            c = c.more();
+                        } else {
+                            c = PersistentList.EMPTY;
+                        }
+                    }
+                    s = c;
+                    ret = buf.toSeq(this);
+                }
             } while (ret == this);
             return ret;
         }
@@ -99,32 +114,6 @@ public class XFSeq {
         public LazySeq toLazySeq() {
             return new LazySeq(this);
         }
-    }
-
-    private static Object step(ISeq s, IFn xf, XFSeqDynamicBuffer2 buf, NextStep ns) {
-        Object ret;
-        if (s == null) {
-            xf.invoke(buf.scope());
-            ret = buf.toSeq();
-        } else {
-            if (s instanceof IChunkedSeq) {
-                IChunk ch = ((IChunkedSeq) s).chunkedFirst();
-                if (buf == ch.reduce(xf, (buf.scope(ch.count())))) {
-                    s = ((IChunkedSeq) s).chunkedMore();
-                } else {
-                    s = PersistentList.EMPTY;
-                }
-            } else {
-                if (buf == xf.invoke(buf.scope(), s.first())) {
-                    s = s.more();
-                } else {
-                    s = PersistentList.EMPTY;
-                }
-            }
-            ns.setSeq(s);
-            ret = buf.toSeq(ns);
-        }
-        return ret;
     }
 
     public static ISeq create(IFn xform, Object coll) {

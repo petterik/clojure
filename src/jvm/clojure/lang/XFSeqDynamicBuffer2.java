@@ -1,6 +1,6 @@
 package clojure.lang;
 
-public class XFSeqDynamicBuffer2 extends AFn {
+public final class XFSeqDynamicBuffer2 extends AFn {
 
     // Note: Changing this from 2, 4 and 8, sees huge difference
     //       in performance (java8).
@@ -16,31 +16,16 @@ public class XFSeqDynamicBuffer2 extends AFn {
         arr = new Object[MIN_SIZE];
     }
 
-    public XFSeqDynamicBuffer2 scope() {
+    public void scope() {
         if (arr == null) {
             arr = new Object[idx < MIN_SIZE ? MIN_SIZE : idx];
         }
-        return this;
     }
 
-    public XFSeqDynamicBuffer2 scope(int size) {
+    public void scope(int size) {
         if (arr == null) {
             arr = new Object[size < MIN_SIZE ? MIN_SIZE : size];
         }
-        return this;
-    }
-
-    public XFSeqDynamicBuffer2 conj(Object o) {
-        if (idx == arr.length) {
-            // Grows quickly to 32, then slows down.
-            // 8 * 4 * 2 * 2 * 2
-            Object[] larger = new Object[idx * (idx <= 8 ? 4 : 2)];
-            System.arraycopy(arr, 0, larger, 0, idx);
-            arr = larger;
-        }
-
-        arr[idx++] = o;
-        return this;
     }
 
     public ISeq toSeq() {
@@ -87,6 +72,38 @@ public class XFSeqDynamicBuffer2 extends AFn {
                 arr[2] = null;
                 arr[3] = null;
                 break;
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+            case 9:
+            case 10:
+            case 11:
+            case 12:
+            case 13:
+            case 14:
+            case 15:
+            case 16:
+            case 17:
+            case 18:
+            case 19:
+            case 20:
+            case 21:
+            case 22:
+            case 23:
+            case 24:
+            case 25:
+            case 26:
+            case 27:
+            case 28:
+            case 29:
+            case 30:
+            case 31:
+            case 32:
+                s = new ChunkedCons(new ArrayChunk(arr, 0, idx), more.toLazySeq());
+                idx = 0;
+                arr = null;
+                break;
             default:
                 // Returns 32 sized chunks in case the transduction created
                 // more items than that. When chained, it can blow up.
@@ -112,11 +129,20 @@ public class XFSeqDynamicBuffer2 extends AFn {
     }
 
     public Object invoke(Object a) {
-        return a;
+        return this;
     }
 
     public Object invoke(Object a, Object b) {
         // assert(a == this);
-        return this.conj(b);
+        if (idx == arr.length) {
+            // Grows quickly to 32, then slows down.
+            // 8 * 4 * 2 * 2 * 2
+            Object[] larger = new Object[idx * (idx <= 8 ? 4 : 2)];
+            System.arraycopy(arr, 0, larger, 0, idx);
+            arr = larger;
+        }
+
+        arr[idx++] = b;
+        return this;
     }
 }
