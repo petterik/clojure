@@ -8,7 +8,7 @@ public class XFSeqStep extends AFn {
     //       in performance (java8).
     //       Setting it to 8 makes it faster on map inc and filter even
     //       compared to vanilla lazy-seqs
-    private static final int MIN_SIZE = 8;
+    private static final int MIN_SIZE = 1;
     private static final Object[] NULLS = new Object[64];
 
     private Object[] arr;
@@ -44,18 +44,18 @@ public class XFSeqStep extends AFn {
     }
 
     public Object invoke() {
-        ISeq s = this.s.seq();
-        if (s == null) {
+        ISeq c = s.seq();
+        if (c == null) {
             xf.invoke(this);
             return (idx == 0) ? null : toSeq(null);
         } else {
-            if (s instanceof IChunkedSeq) {
-                return invokeChunked((IChunkedSeq)s);
+            if (c instanceof IChunkedSeq) {
+                return invokeChunked((IChunkedSeq)c);
             } else {
-                if (this == xf.invoke(this, s.first())) {
-                    this.s = s.more();
+                if (this == xf.invoke(this, c.first())) {
+                    s = c.more();
                 } else {
-                    this.s = PersistentList.EMPTY;
+                    s = PersistentList.EMPTY;
                 }
 
                 if (idx == 1) {
