@@ -1478,6 +1478,10 @@
   ([xf coll ls]
    (clojure.lang.LazySeq. xf coll ls)))
 
+(defn lazy-seq-3
+  [xf coll]
+  (clojure.lang.XFSeq/createTransforming xf coll))
+
 ;;list stuff
 (defn peek
   "For a list or queue, same as first, for a vector, same as, but much
@@ -2763,7 +2767,7 @@
         ([result input & inputs]
            (rf result (apply f input inputs))))))
   ([f coll]
-   (lazy-seq-2 (map f) coll))
+   (lazy-seq-3 (map f) coll))
   ([f c1 c2]
    (lazy-seq
     (let [s1 (seq c1) s2 (seq c2)]
@@ -2822,7 +2826,7 @@
              (rf result input)
              result)))))
   ([pred coll]
-   (lazy-seq-2 (filter pred) coll)))
+   (lazy-seq-3 (filter pred) coll)))
 
 
 (defn remove
@@ -2882,7 +2886,7 @@
                   (ensure-reduced result)
                   result)))))))
   ([n coll]
-   (lazy-seq-2 (take n) coll)))
+   (lazy-seq-3 (take n) coll)))
 
 (defn take-while
   "Returns a lazy sequence of successive items from coll while
@@ -2900,7 +2904,7 @@
               (rf result input)
               (reduced result))))))
   ([pred coll]
-     (lazy-seq-2 (take-while pred) coll)))
+     (lazy-seq-3 (take-while pred) coll)))
 
 (defn drop
   "Returns a lazy sequence of all but the first n items in coll.
@@ -2973,7 +2977,7 @@
                     (vreset! dv nil)
                     (rf result input)))))))))
   ([pred coll]
-   (lazy-seq-2 (drop-while pred) coll)))
+   (lazy-seq-3 (drop-while pred) coll)))
 
 (defn cycle
   "Returns a lazy (infinite!) sequence of repetitions of the items in coll."
@@ -4309,7 +4313,7 @@
    ;; TODO Backcompat: Test non-pos integers repeat the first character forever.
    ;; (take 3 (take-nth 0 [1 2])) => (1 1 1)
    (if (pos? n)
-     (lazy-seq-2 (take-nth n) coll)
+     (lazy-seq-3 (take-nth n) coll)
      (repeat (first coll)))))
 
 (defn interleave
@@ -5049,7 +5053,7 @@
             (do (vswap! seen conj input)
                 (rf result input))))))))
   ([coll]
-   (lazy-seq-2 (distinct) coll)))
+   (lazy-seq-3 (distinct) coll)))
 
 
 
@@ -7298,7 +7302,7 @@ fails, attempts to require sym's namespace and retries."
          ([result input]
           (rf result (f (vswap! i inc) input)))))))
   ([f coll]
-   (lazy-seq-2 (map-indexed f) coll)))
+   (lazy-seq-3 (map-indexed f) coll)))
 
 (defn keep
   "Returns a lazy sequence of the non-nil results of (f item). Note,
@@ -7317,7 +7321,7 @@ fails, attempts to require sym's namespace and retries."
               result
               (rf result v)))))))
   ([f coll]
-   (lazy-seq-2 (keep f) coll)))
+   (lazy-seq-3 (keep f) coll)))
 
 (defn keep-indexed
   "Returns a lazy sequence of the non-nil results of (f index item). Note,
@@ -7339,7 +7343,7 @@ fails, attempts to require sym's namespace and retries."
                 result
                 (rf result v))))))))
   ([f coll]
-     (lazy-seq-2 (keep-indexed f) coll)))
+     (lazy-seq-3 (keep-indexed f) coll)))
 
 (defn bounded-count
   "If coll is counted? returns its count, else will count at most the first n
@@ -7628,7 +7632,7 @@ fails, attempts to require sym's namespace and retries."
               (if (= prior input)
                 result
                 (rf result input))))))))
-  ([coll] (lazy-seq-2 (dedupe) coll)))
+  ([coll] (lazy-seq-3 (dedupe) coll)))
 
 (defn random-sample
   "Returns items from coll with random probability of prob (0.0 -

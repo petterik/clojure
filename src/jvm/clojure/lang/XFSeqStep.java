@@ -20,7 +20,21 @@ public class XFSeqStep extends AFn {
         this.idx = 0;
         this.arr = new Object[MIN_SIZE];
         this.s = s;
+
         this.xf = (IFn)xf.invoke(this);
+    }
+
+    private ISeq invokeChunked(IChunkedSeq cs) {
+        IChunk ch = cs.chunkedFirst();
+        if (arr == null) {
+            int size = ch.count();
+            arr = new Object[size < MIN_SIZE ? MIN_SIZE : size];
+        }
+        if (this == ch.reduce(xf, this)) {
+            return cs.chunkedMore();
+        } else {
+            return PersistentList.EMPTY;
+        }
     }
 
     public Object invoke() {
@@ -38,17 +52,7 @@ public class XFSeqStep extends AFn {
             }
         } else {
             if (c instanceof IChunkedSeq) {
-                IChunkedSeq cs = (IChunkedSeq) c;
-                IChunk ch = cs.chunkedFirst();
-                if (arr == null) {
-                    int size = ch.count();
-                    arr = new Object[size < MIN_SIZE ? MIN_SIZE : size];
-                }
-                if (this == ch.reduce(xf, this)) {
-                    return cs.chunkedMore();
-                } else {
-                    return PersistentList.EMPTY;
-                }
+                c = invokeChunked((IChunkedSeq) c);
             } else {
                 if (arr == null) {
                     arr = new Object[idx < MIN_SIZE ? MIN_SIZE : idx];
@@ -65,8 +69,8 @@ public class XFSeqStep extends AFn {
     }
 
     @Override
-    public Object invoke(Object a) {
-        return a;
+    public Object invoke(Object arg1) {
+        return arg1;
     }
 
     @Override
