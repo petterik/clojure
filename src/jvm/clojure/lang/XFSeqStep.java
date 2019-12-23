@@ -47,7 +47,7 @@ public class XFSeqStep extends AFn {
         ISeq s = this.s.seq();
         if (s == null) {
             xf.invoke(this);
-            return (idx == 0) ? null : new Cons(arr[0], null);
+            return (idx == 0) ? null : toSeq(null);
         } else {
             if (s instanceof IChunkedSeq) {
                 return invokeChunked((IChunkedSeq)s);
@@ -58,11 +58,11 @@ public class XFSeqStep extends AFn {
                     this.s = PersistentList.EMPTY;
                 }
 
-                if (idx == 0) {
-                    return new LazySeq(this);
-                } else {
+                if (idx == 1) {
                     idx = 0;
                     return new Cons(arr[0], new LazySeq(this));
+                } else {
+                    return toSeq(new LazySeq(this));
                 }
             }
         }
