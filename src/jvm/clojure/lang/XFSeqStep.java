@@ -12,75 +12,69 @@ public class XFSeqStep extends AFn {
     private static final Object NOTHING = new Object();
 
     private Object item;
-    private int idx;
 
     private final IFn xf;
     private ISeq s;
 
     public XFSeqStep(IFn xf, ISeq s) {
-        this.idx = 0;
         this.item = NOTHING;
         this.s = s;
 
         this.xf = (IFn)xf.invoke(this);
     }
 
+    private ISeq invokeChunked(IChunkedSeq cs) {
+        IChunk ch = cs.chunkedFirst();
+        this.s = cs.chunkedMore();
+
+        Object[] arr = new Object[ch.count()];
+        int pos = 0;
+        for (int i = 0; i < arr.length; i++) {
+            if (this == xf.invoke(this, ch.nth(i))) {
+                if (item != NOTHING) {
+                    arr[pos++] = item;
+                    item = NOTHING;
+                }
+            } else {
+                if (item != NOTHING) {
+                    arr[pos++] = item;
+                    item = NOTHING;
+                }
+                this.s = PersistentList.EMPTY;
+                break;
+            }
+        }
+        if (pos == 0) {
+            return new LazySeq(this);
+        } else {
+            return new ChunkedCons(new ArrayChunk(arr, 0, pos), new LazySeq(this));
+        }
+    }
+
     public Object invoke() {
-        ISeq ret;
         ISeq s = this.s.seq();
         if (s == null) {
             xf.invoke(this);
-            if (item == NOTHING)
-                ret = null;
-            else {
-                ret = new Cons(item, null);
-            }
+            return (item == NOTHING) ? null : new Cons(item, null);
         } else {
             if (s instanceof IChunkedSeq) {
-                IChunkedSeq cs = (IChunkedSeq)s;
-                IChunk ch = cs.chunkedFirst();
-                ISeq more = cs.chunkedMore();
-
-                int size = ch.count();
-                Object[] arr = new Object[size];
-                int pos = 0;
-                for (int i = 0; i < size; i++) {
-                    Object invoked = xf.invoke(this, ch.nth(i));
-                    if (item != NOTHING) {
-                        arr[pos++] = item;
-                        item = NOTHING;
-                    }
-
-                    // checking for reduced.
-                    if (this != invoked) {
-                        more = PersistentList.EMPTY;
-                        break;
-                    }
-                }
-                this.s = more;
-                if (pos == 0) {
-                    ret = new LazySeq(this);
-                } else {
-                    ret = new ChunkedCons(new ArrayChunk(arr, 0, pos), new LazySeq(this));
-                }
+                return invokeChunked((IChunkedSeq)s);
             } else {
-                ISeq more;
                 if (this == xf.invoke(this, s.first())) {
-                    more = s.more();
+                    this.s = s.more();
                 } else {
-                    more = PersistentList.EMPTY;
+                    this.s = PersistentList.EMPTY;
                 }
-                this.s = more;
 
                 if (item == NOTHING) {
-                    ret = new LazySeq(this);
+                    return new LazySeq(this);
                 } else {
-                    ret = new Cons(item, new LazySeq(this));
+                    ISeq ret = new Cons(item, new LazySeq(this));
                     item = NOTHING;
+                    return ret;
                 }
             }
         }
-        return ret;
     }
 
     @Override
