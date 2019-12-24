@@ -27,7 +27,6 @@ public class XFSeqStep extends AFn {
 
     private ISeq invokeChunked(IChunkedSeq cs) {
         IChunk ch = cs.chunkedFirst();
-        this.s = cs.chunkedMore();
         int len = ch.count();
         if (arr.length < len) {
             arr = new Object[len];
@@ -35,37 +34,41 @@ public class XFSeqStep extends AFn {
 
         for (int i = 0; i < len; i++) {
             if (this != xf.invoke(this, ch.nth(i))) {
-                this.s = PersistentList.EMPTY;
-                break;
+                return PersistentList.EMPTY;
             }
         }
 
-        return toSeq(new LazySeq(this));
+        return cs.chunkedMore();
     }
 
     public Object invoke() {
         ISeq c = s.seq();
-        if (c == null) {
-            xf.invoke(this);
-            return (idx == 0) ? null : toSeq(null);
-        } else {
+        while (c != null) {
             if (c instanceof IChunkedSeq) {
-                return invokeChunked((IChunkedSeq)c);
+                c = invokeChunked((IChunkedSeq) c);
+                if (idx == 0) {
+                    c = c.seq();
+                } else {
+                    this.s = c;
+                    return toSeq(new LazySeq(this));
+                }
             } else {
                 if (this == xf.invoke(this, c.first())) {
-                    s = c.more();
+                    if (idx == 1) {
+                        s = c.more();
+                        idx = 0;
+                        return new Cons(arr[0], new LazySeq(this));
+                    } else {
+                        c = c.next();
+                    }
                 } else {
-                    s = PersistentList.EMPTY;
-                }
-
-                if (idx == 1) {
-                    idx = 0;
-                    return new Cons(arr[0], new LazySeq(this));
-                } else {
-                    return toSeq(new LazySeq(this));
+                    break;
                 }
             }
         }
+
+        xf.invoke(this);
+        return toSeq(null);
     }
 
     @Override
