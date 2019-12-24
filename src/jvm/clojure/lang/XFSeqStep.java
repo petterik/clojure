@@ -53,26 +53,9 @@ public class XFSeqStep extends AFn {
                 c = c.more();
             }
 
-            if (idx == 1) {
+            if (idx != 0) {
                 this.s = c;
-                c = new Cons(arr[0], new LazySeq(this));
-                arr[0] = null;
-                idx = 0;
-                return c;
-            } else if (idx == 0) {
-                continue;
-            } else if (idx <= 32) {
-                this.s = c;
-                c = new ChunkedCons(new ArrayChunk(arrayCopy(), 0, idx), new LazySeq(this));
-                // TODO: Do we need to clear this "cache/buffer" for GC purposes?
-                System.arraycopy(NULLS, 0, arr, 0, idx);
-                idx = 0;
-                return c;
-            } else {
-                this.s = c;
-                c = chunkLargeResult(new LazySeq(this));
-                idx = 0;
-                return c;
+                return toSeq(new LazySeq(this));
             }
         }
 
@@ -103,28 +86,17 @@ public class XFSeqStep extends AFn {
 
     private ISeq toSeq(ISeq seq) {
         switch(idx) {
-            case 0: break;
-            // TODO: Verify whether handrolling these arities is a good idea.
+            case 0:
+                break;
+            // TODO: Verify whether handrolling some cases is a good idea.
             case 1:
                 seq = new Cons(arr[0], seq);
                 arr[0] = null;
                 idx = 0;
                 break;
             case 2:
-                seq = new Cons(arr[0], new Cons(arr[1], seq));
-                System.arraycopy(NULLS, 0, arr, 0, idx);
-                idx = 0;
-                break;
             case 3:
-                seq = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], seq)));
-                System.arraycopy(NULLS, 0, arr, 0, idx);
-                idx = 0;
-                break;
             case 4:
-                seq = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], seq))));
-                System.arraycopy(NULLS, 0, arr, 0, idx);
-                idx = 0;
-                break;
             case 5:
             case 6:
             case 7:
