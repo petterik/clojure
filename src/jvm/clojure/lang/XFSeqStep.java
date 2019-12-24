@@ -42,33 +42,52 @@ public class XFSeqStep extends AFn {
     }
 
     public Object invoke() {
-        ISeq c = s.seq();
-        while (c != null) {
+        for(ISeq c = this.s.seq(); c != null; c = c.seq()) {
             if (c instanceof IChunkedSeq) {
                 c = invokeChunked((IChunkedSeq) c);
-                if (idx == 0) {
-                    c = c.seq();
-                } else {
-                    this.s = c;
-                    return toSeq(new LazySeq(this));
-                }
             } else {
-                if (this == xf.invoke(this, c.first())) {
-                    if (idx == 1) {
-                        s = c.more();
-                        idx = 0;
-                        return new Cons(arr[0], new LazySeq(this));
-                    } else {
-                        c = c.next();
-                    }
-                } else {
+                if (this != xf.invoke(this, c.first())) {
                     break;
                 }
+
+                c = c.more();
+            }
+
+            if (idx == 1) {
+                this.s = c;
+                c = new Cons(arr[0], new LazySeq(this));
+                arr[0] = null;
+                idx = 0;
+                return c;
+            } else if (idx == 0) {
+                continue;
+            } else if (idx <= 32) {
+                this.s = c;
+                c = new ChunkedCons(new ArrayChunk(arrayCopy(), 0, idx), new LazySeq(this));
+                // TODO: Do we need to clear this "cache/buffer" for GC purposes?
+                System.arraycopy(NULLS, 0, arr, 0, idx);
+                idx = 0;
+                return c;
+            } else {
+                this.s = c;
+                c = chunkLargeResult(new LazySeq(this));
+                idx = 0;
+                return c;
             }
         }
 
         xf.invoke(this);
-        return toSeq(null);
+        if (idx == 0) {
+            return null;
+        } else {
+            return new ChunkedCons(new ArrayChunk(arr, 0, idx), null);
+        }
+    }
+
+    private Object[] arrayCopy() {
+        Object[] ret = new Object[idx];
+        System.arraycopy(arr, 0, ret, 0, idx);
+        return ret;
     }
 
     @Override
@@ -82,38 +101,29 @@ public class XFSeqStep extends AFn {
         return a;
     }
 
-    private ISeq toSeq(ISeq more) {
-        ISeq s;
+    private ISeq toSeq(ISeq seq) {
         switch(idx) {
-            case 0:
-                s = more;
-                break;
+            case 0: break;
             // TODO: Verify whether handrolling these arities is a good idea.
             case 1:
-                s = new Cons(arr[0], more);
-                idx = 0;
+                seq = new Cons(arr[0], seq);
                 arr[0] = null;
+                idx = 0;
                 break;
             case 2:
-                s = new Cons(arr[0], new Cons(arr[1], more));
+                seq = new Cons(arr[0], new Cons(arr[1], seq));
+                System.arraycopy(NULLS, 0, arr, 0, idx);
                 idx = 0;
-                arr[0] = null;
-                arr[1] = null;
                 break;
             case 3:
-                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], more)));
+                seq = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], seq)));
+                System.arraycopy(NULLS, 0, arr, 0, idx);
                 idx = 0;
-                arr[0] = null;
-                arr[1] = null;
-                arr[2] = null;
                 break;
             case 4:
-                s = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], more))));
+                seq = new Cons(arr[0], new Cons(arr[1], new Cons(arr[2], new Cons(arr[3], seq))));
+                System.arraycopy(NULLS, 0, arr, 0, idx);
                 idx = 0;
-                arr[0] = null;
-                arr[1] = null;
-                arr[2] = null;
-                arr[3] = null;
                 break;
             case 5:
             case 6:
@@ -145,27 +155,31 @@ public class XFSeqStep extends AFn {
             case 32:
                 Object[] ret = new Object[idx];
                 System.arraycopy(arr, 0, ret, 0, idx);
-                s = new ChunkedCons(new ArrayChunk(ret, 0, idx), more);
+                seq = new ChunkedCons(new ArrayChunk(ret, 0, idx), seq);
                 // TODO: Do we need to clear this "cache/buffer" for GC purposes?
-                // System.arraycopy(NULLS, 0, arr, 0, idx);
+                System.arraycopy(NULLS, 0, arr, 0, idx);
                 idx = 0;
                 break;
             default:
-                // Returns 32 sized chunks in case the transduction created
-                // more items than that. When chained, it can blow up.
-                // This problem was found with code that repeated interpose:
-                // (interpose nil (interpose nil ... (interpose nil (range)) ... ))
-                s = more;
-                int offset = idx;
-                do {
-                    int end = offset;
-                    offset = Math.max(0, offset - 32);
-                    s = new ChunkedCons(new ArrayChunk(arr, offset, end), s);
-                } while (offset > 0);
-                arr = new Object[32];
-                idx = 0;
+                seq = chunkLargeResult(seq);
                 break;
         }
+        return seq;
+    }
+
+    private ISeq chunkLargeResult(ISeq s) {
+        // Returns 32 sized chunks in case the transduction created
+        // more items than that. When chained, it can blow up.
+        // This problem was found with code that repeated interpose:
+        // (interpose nil (interpose nil ... (interpose nil (range)) ... ))
+        int offset = idx;
+        do {
+            int end = offset;
+            offset = Math.max(0, offset - 32);
+            s = new ChunkedCons(new ArrayChunk(arr, offset, end), s);
+        } while (offset > 0);
+        arr = new Object[32];
+        idx = 0;
         return s;
     }
 }
